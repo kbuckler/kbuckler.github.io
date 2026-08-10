@@ -10,7 +10,7 @@ Taking it literally turned into this project. Orrery is a single-player 4X space
 
 The other goal is the one the essay planted. I wanted a thunderdome. (Cue the "that's bait" meme. Spicy premise. I took the bait anyway.) I wanted to see how far I could push CI before it breaks, and when it breaks, what an autonomous system can actually do to fix itself. So Claude agents claim issues, implement them, review each other's pull requests, and merge their own work when the gates are green. My job is direction: answer design questions, bless or veto decisions, personally gate anything touching CI, spending, or the constitution documents. Most days that amounts to managing a very fast, very literal engineering team that works while I sleep.
 
-Five days in, the repo holds 360 commits, roughly 73,000 lines of C#, about 2,700 tests, and the issue counter passed 340 this morning. I wrote almost none of it.
+Five days in, the repo holds 215 authored commits (the raw log says 385, but the rest is merge plumbing), roughly 73,000 lines of C#, about 2,700 tests, and the issue counter passed 340 this morning. I wrote almost none of it.
 
 Also, a note for anyone reading from outside: the repo's private for now, so the issue and PR numbers scattered through these posts are internal bookkeeping. Treat them like timestamps.
 
