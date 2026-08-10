@@ -1,7 +1,7 @@
 ---
 layout: post
 title: "What the machine costs"
-date: 2026-08-09 17:00:00 -0700
+date: 2026-08-09 15:00:00 -0700
 ---
 
 Third post today, so apparently this is what Sundays are now. This one's about money, because the first real bill for running Orrery's agent fleet showed up this weekend and it came from a direction I didn't expect.
