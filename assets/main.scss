@@ -2,10 +2,18 @@
 ---
 @import "minima";
 
+$sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+
 body {
-  font-size: 17px;
+  font-family: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+  font-size: 18px;
   line-height: 1.7;
   color: #24292f;
+}
+
+.site-header, .site-title, .site-nav, .post-meta, .post-nav, .post-nav-home,
+.site-footer, h1, h2, h3, .post-title, .post-link {
+  font-family: $sans;
 }
 
 .wrapper { max-width: 700px; }
@@ -23,6 +31,12 @@ a:hover { color: #2b3fae; }
 .post-list h3 { margin-bottom: 4px; }
 .post-link { font-size: 24px; font-weight: 600; }
 .post-meta { color: #6a737d; font-size: 14px; }
+.post-list .post-meta {
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #57606a;
+}
 
 .post-title { font-size: 32px; letter-spacing: -0.02em; line-height: 1.2; }
 .post-content h2 { font-size: 23px; margin-top: 44px; font-weight: 600; }
@@ -50,6 +64,7 @@ blockquote { border-left: 3px solid #3b5bdb; color: #57606a; font-style: normal;
   a, a:visited { color: #8da2fb; }
   a:hover { color: #b3c2fd; }
   .post-meta { color: #8b949e; }
+  .post-list .post-meta { color: #9aa4af; }
   h1, h2, h3, .post-title, .post-link { color: #e6edf3; }
   blockquote { color: #9aa4af; border-left-color: #8da2fb; }
   pre, code { background: #161b22; color: #c9d1d9; border: 1px solid #21262d; }
