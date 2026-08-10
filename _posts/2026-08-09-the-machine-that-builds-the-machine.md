@@ -46,4 +46,8 @@ And there's a budget envelope: the Claude subscription plus at most 25 dollars a
 
 The pipeline has quietly become a second product, which is more or less what the thunderdome experiment from the first entry was for. A dozen open issues track packaging the loop for reuse: extracting the sweep arms into tested scripts, splitting the process docs into a generic contract plus an Orrery overlay, externalizing the reviewer prompt. Open questions I'm chewing on: whether the roles deserve different model tiers, when the nightly soak matrix outgrows free minutes and the spare PC finally earns its keep as a runner, and how much of my remaining ten percent of the work is truly judgment versus habits I haven't written down clearly enough to hand over.
 
+## Update, Sunday evening
+
+That "when the spare PC earns its keep" question aged fast. As of tonight Proxmox is running locally, managing docker images for the runners, so spinning up the next one is a clone instead of an afternoon of setup. And the new hardware pulled more than CI weight. Unity now runs headless in the pipeline, playmode tests capture screenshots of the actual rendered game, those land on every PR as a changed-vs-baseline comment (#413), and an agent with vision judges the frames (#430) before the sweep will merge (#435). A PR that renders wrong now fails even when every unit test is green. The pipeline learned to see the game it's building.
+
 More soon.
