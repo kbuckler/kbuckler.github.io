@@ -63,7 +63,7 @@ body { font-family: 'IBM Plex Sans', Arial, sans-serif; }
 <p style="font-size:36px;line-height:1.35;color:#B9C4D6;width:700px">How work gets from a GitHub issue to main, and what runs it</p>
 <p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#B9C4D6">November 2026</p>
 </div>
-<aside hidden>A quick tour of how Orrery gets built. First the game, then the architecture in three layers: the stewards who manage the loop, the loop itself, and the fleet of agents it runs. Then how results feed back, the machines it runs on, the numbers so far, what we learned and what’s next. The backdrop is a staged hero shot from the live editor: Freighter #38 passing Sol’s ringed gas giant on day 165 of a seed-1 run. It’s the game’s own models and scene, but set up for this deck: the camera was placed by hand, the giant was turned so its rings open toward us, the freighter’s paint and shine were toned down with a rim light added, and the ring drawing was fixed for the shot. The game’s ship panel doesn’t look like this yet.</aside>
+<aside hidden>A quick tour of how Orrery gets built. First the game, then the architecture in three layers, taken top to bottom. The top layer is judgment: the stewards, how the roadmap gets built, who decides what and whose word counts. The middle is the loop itself and the machines it runs on. The bottom is the fleet of agents: what each one is given, what it reports back, what that costs and how we pick and test the models. Then how results feed back, the numbers so far, what we learned and what’s next. The backdrop is a staged hero shot from the live editor: Freighter #38 passing Sol’s ringed gas giant on day 165 of a seed-1 run. It’s the game’s own models and scene, but set up for this deck: the camera was placed by hand, the giant was turned so its rings open toward us, the freighter’s paint and shine were toned down with a rim light added, and the ring drawing was fixed for the shot. The game’s ship panel doesn’t look like this yet.</aside>
 </section>
 <section id="intro" class="slide" aria-label="Slide 2: Project Orrery" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:28px">
 <div style="display:flex;flex-direction:row;align-items:center;gap:64px">
@@ -173,7 +173,7 @@ body { font-family: 'IBM Plex Sans', Arial, sans-serif; }
 <p style="position:absolute;left:577px;top:713px;width:260px;font-size:24px;white-space:nowrap;color:#3E4756">job cards</p>
 <p style="position:absolute;left:1092px;top:713px;width:300px;font-size:24px;white-space:nowrap;color:#3E4756">PRs, reviews, records</p>
 <p style="position:absolute;left:1270px;top:798px;width:310px;font-size:24px;white-space:nowrap;color:#3E4756">screenshots for review</p>
-<aside hidden>This is the whole system in three layers. On top is judgment: me, and five steward sessions. Stewards are LLM sessions, so they can read a situation and decide. They stage the work by grooming and readying issues, they tune the loop’s settings, put a hold on a PR that would break main, step in when something is stuck, and ask me for decisions in batches. In the middle is the loop, and there is no model in it. The coordinator is plain code on a timer, with a pass starting every five to ten minutes. It reads everything on GitHub, which is the only shared state, launches agents for ready work, and merges what passes. CI runs on seventeen self-hosted runners on a Linux box called astrolabe. At the bottom is the fleet: Codex and Claude sessions that the coordinator launches with a job card. They write the code, repair failing PRs and review each other’s work, and everything they produce goes back to GitHub as PRs, reviews and session records. The arrow on the right is the feedback path: screenshots from CI go to the review agent, which the feedback slides cover later.</aside>
+<aside hidden>This is the whole system in three layers. On top is judgment: me, and five steward sessions. Stewards are LLM sessions, so they can read a situation and decide. They stage the work by grooming and readying issues, they tune the loop’s settings, put a hold on a PR that would break main, step in when something is stuck, and ask me for decisions in batches. In the middle is the loop, and there is no model in it. The coordinator is plain code on a timer, with a pass starting every five to ten minutes. It reads everything on GitHub, which is the only shared state, launches agents for ready work, and merges what passes. CI runs on seventeen self-hosted runners on a Linux box called astrolabe. At the bottom is the fleet: Codex and Claude sessions that the coordinator launches with a job card. They write the code, repair failing PRs and review each other’s work, and everything they produce goes back to GitHub as PRs, reviews and session records. The arrow on the right is the feedback path: screenshots from CI go to the review agent. The rest of the talk takes these layers top to bottom and comes back to that arrow at the end.</aside>
 </section>
 <section id="stewards" class="slide" aria-label="Slide 5: Stewards" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:32px">
 <div style="display:flex;flex-direction:column;gap:16px">
@@ -237,7 +237,144 @@ body { font-family: 'IBM Plex Sans', Arial, sans-serif; }
 <h3 style="font-size:36px;font-weight:600;color:#8A5A0A">Their state lives on GitHub, so restarting one only takes its parent issue number.</h3>
 <aside hidden>Stewards are the top layer, and they are the part that thinks. Each one is an interactive LLM session I start with a parent issue, and it owns a program of work for days. The loop underneath is deterministic and can’t make a judgment call, so the stewards make them for it. They feed it: they do the research, ask me what they need answered, then file, groom and ready the issues. Backlog &amp; roadmap keeps about 15 issues runnable at a time, at least 6 of them without Unity. It releases the highest priority first and the oldest first within a priority, and it won’t ready filler to hit the number. They tune and repair it: Loop &amp; watch reads throughput every hour, changes settings and model pins under a lease, puts a hold on a PR that would break main, sweeps blocked PRs when the 25-PR ceiling binds, and files one issue for each kind of stall it finds. And they check what comes out: Simulation &amp; gameplay runs five-year soaks and the first-hour benchmarks every three hours when the sim has changed, which on November 7 caught a merge that broke two bars hosted CI doesn’t run, Runner hosts measures the fleet before and after every host change, and Presentation checks main’s CI screenshots every three hours and plays the first hour in the live editor every day or two. A steward only writes code itself when I tell it to, and none of this counts as the loop running on its own. Routine writes go out as orrery-steward[bot]. Anything that needs my authority goes out on my account with a RULING: comment. A steward keeps nothing in its own memory: its charter is on the parent issue, its progress is on a GitHub project board, and heartbeats, pauses and leases on shared resources are on one shared board. If a session dies, a new one picks up from the parent issue.</aside>
 </section>
-<section id="lifecycle" class="slide" aria-label="Slide 6: Issue lifecycle" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
+<section id="roadmap" class="slide" aria-label="Slide 6: Roadmap" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:36px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA">Roadmap</h2>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">A milestone is a written spec with exit criteria. I ratify the spec and rule on the ship.<br>The loop does everything in between.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:stretch;gap:16px">
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:6px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">1 · SPEC</p>
+<h3 style="font-size:28px;font-weight:600;line-height:1.2;color:#F4F1EA">A session writes the spec</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">Exit criteria and an issue tree</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #D9A441;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:6px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">2 · RATIFY</p>
+<h3 style="font-size:28px;font-weight:600;line-height:1.2;color:#F4F1EA">I approve the<br>spec PR</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">Protected. Review reads the plan as a whole</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:6px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">3 · FILE</p>
+<h3 style="font-size:28px;font-weight:600;line-height:1.2;color:#F4F1EA">The tree becomes issues</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">Groomed, sized and tied to a criterion</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:6px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">4 · DELIVER</p>
+<h3 style="font-size:28px;font-weight:600;line-height:1.2;color:#F4F1EA">The loop delivers</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">Ready by priority. Bugs join the milestone</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #D9A441;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:6px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">5 · SHIP</p>
+<h3 style="font-size:28px;font-weight:600;line-height:1.2;color:#F4F1EA">I rule my rows and ship</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">Opened once every issue is closed</p>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
+<div style="display:flex;flex-direction:column;gap:8px;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">What bounds it</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Five design pillars can veto a feature. New system ideas wait in the icebox until the next plan.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">Two gates</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Gate A and Gate B are go or no-go playtests that span milestones. No agent signs them off.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">How I steer</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Comments, labels, grants and playtests. In a decision round a steward asks me a few questions at a time.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#B9C4D6">Gold steps are mine · docs/ROADMAP.md, specs in docs/milestones · decision #126</p>
+<aside hidden>This is where the loop’s work comes from. The roadmap is one document, ROADMAP.md, cut into milestones that each end with something you can run and watch. Before a milestone starts, a planning session writes its spec: the intent, numbered exit criteria, non-goals, the decisions already made, and usually the tree of issues. That spec goes up as a protected PR. The review agent reads the criteria and the tree as one plan, and I ratify it, either by merging it myself or by putting merge-delegated on it. There’s no later approval of the set. After that the tree is filed as groomed issues, each tied to a criterion, sized and linked to its blockers. Nothing is ready at filing. The coordinator readies groomed, unblocked P1 issues itself when the runnable queue drops below 15, stewards release the rest by priority, and a protected issue waits for a ready label from my account. The loop then delivers them like any other work. Bugs and splits found along the way are filed into the same milestone without another review, but the spec is never edited to fit what happened. If a criterion can’t be met, that’s a provisional decision or a design question, which the next slide covers. When the milestone has no open issues left, the coordinator opens a protected ship PR listing the criteria only I can verify. I rule on each one, accept it or carry the miss forward as a new issue, and landing that PR is the ship. Three things sit around that flow. The five design pillars can veto a feature, and new system ideas that turn up mid-milestone go to the icebox with a one-line pitch and wait for the next planning pass. Gate A and Gate B are a different kind of thing from a milestone: they’re the two go or no-go playtests, and no agent signs those. And there are only a few ways I steer. A plain comment from my account on any issue or PR is a ruling on that thread, and some of those change the rules themselves. Labels are decisions too: my ready on protected work, merge-delegated on a PR, and my taking ready off as a veto. Standing grants on a steward’s charter let it make a class of calls without asking. Playtests and feel verdicts are mine, and my play notes become issues. And when I say “interrogate me”, a steward collects the open questions from its program, or from all of them if I ask, drops the ones I’ve already answered anywhere, frames each with its options and what each would cost, and asks me a few at a time. Each answer goes back to its own thread as a ruling.</aside>
+</section>
+<section id="decisions" class="slide" aria-label="Slide 7: Who decides" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:24px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA">Who decides</h2>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">No agent settles an ambiguity silently. Each kind of call has an owner, a record and a veto.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="display:flex;flex-direction:row;gap:24px;padding:0px 26px">
+<p style="width:320px;flex:none;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#D9A441">CALL</p>
+<p style="width:470px;flex:none;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#D9A441">WHEN</p>
+<p style="width:250px;flex:none;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#D9A441">DECIDED BY</p>
+<p style="flex:1;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#D9A441">WHAT HAPPENS</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:center;gap:24px;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:12px 24px">
+<p style="width:320px;flex:none;font-size:28px;font-weight:600;white-space:nowrap;color:#F4F1EA">Provisional decision</p>
+<p style="width:470px;flex:none;font-size:24px;line-height:1.35;color:#B9C4D6">A minor fork inside the pillars: no new system, no reversal</p>
+<p style="width:250px;flex:none;font-size:24px;line-height:1.35;color:#F4F1EA">The agent itself</p>
+<p style="flex:1;font-size:24px;line-height:1.35;color:#B9C4D6">Filed as an issue. I can veto by comment for 7&#160;days after the merge.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:center;gap:24px;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:12px 24px">
+<p style="width:320px;flex:none;font-size:28px;font-weight:600;white-space:nowrap;color:#F4F1EA">Advisory</p>
+<p style="width:470px;flex:none;font-size:24px;line-height:1.35;color:#B9C4D6">A review finding that isn’t worth blocking the PR</p>
+<p style="width:250px;flex:none;font-size:24px;line-height:1.35;color:#F4F1EA">The review agent</p>
+<p style="flex:1;font-size:24px;line-height:1.35;color:#B9C4D6">Filed as an issue that must close as addressed, reconciled or cancelled.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:center;gap:24px;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:12px 24px">
+<p style="width:320px;flex:none;font-size:28px;font-weight:600;white-space:nowrap;color:#F4F1EA">Steward ruling</p>
+<p style="width:470px;flex:none;font-size:24px;line-height:1.35;color:#B9C4D6">A common gameplay, UI or look question in one program</p>
+<p style="width:250px;flex:none;font-size:24px;line-height:1.35;color:#F4F1EA">The program’s steward</p>
+<p style="flex:1;font-size:24px;line-height:1.35;color:#B9C4D6">Posted as the steward’s call and listed in its report. A comment vetoes it.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:center;gap:24px;background:#18223A;border:2px solid #D9A441;border-radius:16px;padding:12px 24px">
+<p style="width:320px;flex:none;font-size:28px;font-weight:600;white-space:nowrap;color:#F4F1EA">Design question</p>
+<p style="width:470px;flex:none;font-size:24px;line-height:1.35;color:#B9C4D6">A new system, pillar tension, a reversal or a question of feel</p>
+<p style="width:250px;flex:none;font-size:24px;font-weight:600;line-height:1.35;color:#D9A441">Me</p>
+<p style="flex:1;font-size:24px;line-height:1.35;color:#B9C4D6">Work on that thread stops. I pick from an option menu in a comment.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:center;gap:24px;background:#18223A;border:2px solid #D9A441;border-radius:16px;padding:12px 24px">
+<p style="width:320px;flex:none;font-size:28px;font-weight:600;white-space:nowrap;color:#F4F1EA">Protected change</p>
+<p style="width:470px;flex:none;font-size:24px;line-height:1.35;color:#B9C4D6">Decision records, auth, new libraries, manual steps</p>
+<p style="width:250px;flex:none;font-size:24px;font-weight:600;line-height:1.35;color:#D9A441">Me</p>
+<p style="flex:1;font-size:24px;line-height:1.35;color:#B9C4D6">The PR waits for my merge-delegated label. Checks and review still apply.</p>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:16px 0px 0px 0px">A ruling counts only from my login. A delegated call has to say it’s the steward’s, not mine.</p>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:16px 0px 0px 0px">Every delegated call is written down, and one comment from me vetoes it.</p>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:16px 0px 0px 0px">Recorded decisions are append-only. Reversing one always comes to me.</p>
+</div>
+<aside hidden>This is who decides what, and it’s what keeps my time for the calls that are actually mine. The rule underneath is that an agent never settles an ambiguity silently. If the fork is minor, meaning it stays inside the pillars, adds no new system, touches nothing protected and reverses no recorded decision, the agent picks, files a provisional-decision issue, notes it in the PR and carries on. Plenty of these are player-facing interface or economy calls, and those get listed in a digest issue for me before they’re accepted. I have seven days after the merge to veto one with a comment. The Backlog steward runs those clocks and closes each one with the merge time and a note that I didn’t veto, sometimes a few days late. Vetoes do happen: I vetoed one on November 10. Review findings that aren’t worth blocking a PR become advisory issues, and those can only close as addressed, reconciled or cancelled, so they can’t quietly rot. Owners fold small ones in the same area into a single piece of work. A steward can settle common gameplay, interface and look questions inside its own program under a standing grant. It posts the ruling as its own call, not as my words, and lists it in its next report, and a comment from me puts the question back with me. Sessions can also answer purely technical questions that have no player-visible effect, the same way. Then the two that come to me. A design question is anything with a new system, tension with a pillar, a reversal of a recorded decision, or feel beyond that steward grant. The agent stops that thread, marks the issue blocked and files the question, usually with a menu of options, and I answer in a plain comment, often from my phone. Protected changes are new decision records, authentication and authorization, third-party libraries and manual steps, plus milestone specs and the reviewer’s own prompt. The first four need me item by item, even where a steward holds a grant. Those PRs still need green checks and a review, and then they wait for my merge-delegated label. In the week of November 2 that came to 58 provisional decisions and 149 advisories filed without me, and on my side 68 design questions closed and 56 protected merges out of 554. About ten of those 68 questions mention the steward grant in the thread, so most of them still got an answer from me. The guard rails are along the bottom. Only my GitHub login counts as my voice, and the coordinator checks who applied a protected label before it acts on it. Every delegated call is written down where I’ll see it, and I can revoke a grant by editing one paragraph. And the decision records, about 320 of them, are append-only: one can be amended with a new record, but reversing one is always my call. Taste isn’t delegated at all. That’s the weekly feel pass and the gate playtests.</aside>
+</section>
+<section id="identity" class="slide" aria-label="Slide 8: Identities" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Identities</h2>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">The login decides what an actor may do. A signature in a comment doesn’t grant anything.</p>
+</div>
+<div style="display:flex;flex-direction:column">
+<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px;border-top:2px solid #E2DCCF">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;font-weight:600;color:#8A5A0A;width:560px">kbuckler</p>
+<p style="font-size:28px;line-height:1.35;color:#0F1626;width:1080px">Rulings, merge-delegated, protected ready, P0 and releasing hold</p>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px;border-top:2px solid #E2DCCF">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#0F1626;width:560px">orrery-steward[bot]</p>
+<p style="font-size:28px;line-height:1.35;color:#3E4756;width:1080px">Steward comments, issue edits, labels and pushes</p>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px;border-top:2px solid #E2DCCF">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#0F1626;width:560px">orrery-session[bot]</p>
+<p style="font-size:28px;line-height:1.35;color:#3E4756;width:1080px">Commits, pushes and PRs from Codex and Claude sessions</p>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px;border-top:2px solid #E2DCCF">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#0F1626;width:560px">orrery-coordinator[bot]</p>
+<p style="font-size:28px;line-height:1.35;color:#3E4756;width:1080px">Coordinator merges, labels and comments, plus Claude’s reviews</p>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px;border-top:2px solid #E2DCCF">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#0F1626;width:560px">review App</p>
+<p style="font-size:28px;line-height:1.35;color:#3E4756;width:1080px">Codex and OpenCode review verdicts, with minimal permissions</p>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px;border-top:2px solid #E2DCCF;border-bottom:2px solid #E2DCCF">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#0F1626;width:560px">github-actions</p>
+<p style="font-size:28px;line-height:1.35;color:#3E4756;width:1080px">CI checks from pr.yml and unity.yml</p>
+</div>
+</div>
+<p style="font-size:28px;line-height:1.35;color:#0F1626;background:#E6DFD0;padding:24px 32px;border-radius:16px">Only my login carries maintainer authority. Under decision #12422 a steward can add protected ready in its own area, but only as a signed RULING: posted on my account.</p>
+<aside hidden>Every actor writes as its own identity, and that’s what decides what it’s allowed to do. Maintainer authority comes from my login and nothing else. An agent can’t get it by signing a comment as me, and the coordinator’s status report audits for that. The bots mint short-lived tokens from private keys kept at mode 600 and never fall back to a personal token. The coordinator does all its reads and writes as its own App, so it doesn’t eat into my API rate limit. Status: that App is still called orrery-autonomous-agent on GitHub today. orrery-coordinator is the name it’s moving to. Codex and OpenCode reviews go through a separate App with fewer permissions, and the coordinator won’t launch one if that App turns out to be the same identity as its own.</aside>
+</section>
+<section id="lifecycle" class="slide" aria-label="Slide 9: Issue lifecycle" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
 <div style="display:flex;flex-direction:column;gap:16px">
 <h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Issue lifecycle</h2>
 <p style="font-size:28px;line-height:1.35;color:#3E4756">One issue, one issue-N branch, one PR. You can tell where anything is from its labels and branch.</p>
@@ -283,9 +420,9 @@ body { font-family: 'IBM Plex Sans', Arial, sans-serif; }
 <p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#0F1626;background:#E6DFD0;padding:8px 18px;border-radius:24px">needs-kbuckler</p>
 <p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#0F1626;background:#E6DFD0;padding:8px 18px;border-radius:24px">protected</p>
 </div>
-<aside hidden>This is the path almost every change takes. Grooming scopes the issue and sets its priority. Putting ready on it is the approval. There’s no separate sign-off step. Stewards run an issue through a readiness checklist before they label it, and the coordinator checks again by rule when it promotes or dispatches: the required sections are there, the budget parses, the files it names exist on main and nothing it depends on is still open. An issue that fails goes back as needs-groom. A session claims it by pushing a branch called issue-N, and since only one push can create that branch, two sessions can’t grab the same issue. Work happens in a draft PR with a local gate and a self-review, then it flips to ready for review, which starts full CI and an independent review agent. If it passes, it joins the merge train. Blocked means waiting on another issue, needs-groom means the coordinator sent it back for another grooming pass, design-question means it needs a call from me, hold is a manual park, needs-kbuckler means the agent hit something outside its reach, and protected means I have to approve the merge.</aside>
+<aside hidden>Now the middle layer, the loop itself. This is the path almost every change takes. Grooming scopes the issue and sets its priority. Putting ready on it is the approval. There’s no separate sign-off step. Stewards run an issue through a readiness checklist before they label it, and the coordinator checks again by rule when it promotes or dispatches: the required sections are there, the budget parses, the files it names exist on main and nothing it depends on is still open. An issue that fails goes back as needs-groom. A session claims it by pushing a branch called issue-N, and since only one push can create that branch, two sessions can’t grab the same issue. Work happens in a draft PR with a local gate and a self-review, then it flips to ready for review, which starts full CI and an independent review agent. If it passes, it joins the merge train. Blocked means waiting on another issue, needs-groom means the coordinator sent it back for another grooming pass, design-question means it needs a call from me, hold is a manual park, needs-kbuckler means the agent hit something outside its reach, and protected means I have to approve the merge.</aside>
 </section>
-<section id="coordinator" class="slide" aria-label="Slide 7: The coordinator" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
+<section id="coordinator" class="slide" aria-label="Slide 10: The coordinator" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
 <div style="display:flex;flex-direction:column;gap:16px">
 <h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">The coordinator</h2>
 <p style="font-size:28px;line-height:1.35;color:#3E4756">orrery-loop is a .NET service that starts a pass every 5 to 10 minutes. There’s no model inside it. It schedules and coordinates the agent fleet by rule, and can only do what its code allows.</p>
@@ -324,7 +461,100 @@ body { font-family: 'IBM Plex Sans', Arial, sans-serif; }
 </div>
 <aside hidden>The coordinator is plain code on a timer, and it redeploys itself from main when its own fixes land. Each pass it reads every open PR and works out who owes the next move. Mechanical things it just does: landing merge-train batches, closing fixed issues, reviving unblocked issues, cleaning up. Anything that needs judgment, it hands to an agent session or a CI run. Putting ready on an issue gets it dispatched within minutes. That’s how it coordinates the fleet: today’s caps are 5 protected, 15 unprotected and 6 Unity PRs in flight, with a ceiling of 25 open loop PRs that also counts ones parked off-loop, and the P0 to P3 priority rungs decide the order. It’s built to run unattended. It re-reads a PR before every write, caps its irreversible writes per pass, and if it can’t read a state it waits instead of guessing. The third column is stuff it isn’t allowed to decide at all. It has no way to page me. It escalates by adding a label or a comment, so if nobody looks at the board, nothing happens. It never reviews code and never writes code.</aside>
 </section>
-<section id="train" class="slide" aria-label="Slide 8: Merge train" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<section id="pass" class="slide" aria-label="Slide 11: One pass" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:36px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA">One pass</h2>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Every pass runs the same five steps in the same order, and every decision in it is plain code.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:stretch;gap:16px">
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:6px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">1 · OBSERVE</p>
+<h3 style="font-size:28px;font-weight:600;line-height:1.2;color:#F4F1EA">Read GitHub</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">Main’s CI, runner health and every open PR</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:6px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">2 · CLASSIFY</p>
+<h3 style="font-size:28px;font-weight:600;line-height:1.2;color:#F4F1EA">Who moves next</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">One next actor per PR: a stage, an agent or me</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:6px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">3 · ACT</p>
+<h3 style="font-size:28px;font-weight:600;line-height:1.2;color:#F4F1EA">Run the stages</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">All 39 of them, always in the same order</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:6px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">4 · REPORT</p>
+<h3 style="font-size:28px;font-weight:600;line-height:1.2;color:#F4F1EA">Write it down</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">The beacon on #142 says what the pass did</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:6px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">5 · WAIT</p>
+<h3 style="font-size:28px;font-weight:600;line-height:1.2;color:#F4F1EA">Sleep or wake</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">A change on a PR wakes a short pass early</p>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
+<div style="display:flex;flex-direction:column;gap:8px;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">Two kinds of pass</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">A full pass rereads everything. Between them a 10-second change feed wakes a short pass for the PRs that moved.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">It can stop itself</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">One repo variable pauses every stage that writes. An open P0 freezes the train and normal dispatch until it’s fixed.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">Decisions from GitHub</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Each pass re-derives its decisions from GitHub. Sessions and logs live on the Mac, so a self-deploy drains writers first.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#B9C4D6">service/Orrery.Loop · a full pass is on a 5-minute timer and starts every 5 to 10 minutes · the stage order is pinned by a test</p>
+<aside hidden>This is what the coordinator does every time it wakes up. First it observes. It checks how much GitHub API budget is left, reads whether main’s CI is green, whether the kill switch is on and whether the runners are healthy, then reads every open PR and the merge train in flight. Second it classifies. One table decides, for each PR, who owes the next move: one of its own stages, an agent session, or me. Third it acts, by running 39 stages in a fixed order that a test pins. Each stage does one narrow job and holds itself if its inputs aren’t readable. The order matters: emergency posture and labels come first, then clean-up, recovery and review, then merging, then dispatch, then refilling the queue. Fourth it reports, by rewriting the beacon issue with what the pass did and what it’s waiting on. That runs even when everything else is paused, so a fresh timestamp always means the loop is alive. Fifth it waits. The full pass is on a five-minute timer and in practice starts every five to ten minutes, because under load a pass runs long. On November 10 dispatch alone took up to 228 seconds. While it sleeps it polls a cheap change feed every ten seconds, and if a PR moved it runs a short pass for just that PR instead of waiting for the timer. The full pass is still the floor: anything a short pass skips, the next full pass picks up. A few properties make this safe to leave alone. It can stop itself: one repository variable pauses every stage that writes, and a spent API budget or an unreadable state holds the pass instead of guessing. An open P0 puts it in emergency mode, which freezes the train and normal dispatch until the P0 is dealt with. Its decisions are re-derived from GitHub on every pass, so nothing it decides depends on memory. What does live on the Mac is the agents’ sessions, the ledgers and the decision logs, which is why a self-deploy is careful: it waits for main’s CI on the new commit, stops admitting writers, drains the ones in flight and only then exits so launchd restarts it on the new release. And only one coordinator may act at a time, enforced by a lock it renews on every pass.</aside>
+</section>
+<section id="stages" class="slide" aria-label="Slide 12: Stages" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:24px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Stages</h2>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Merging and dispatch are two of 39 stages. The rest keep the board honest and rescue stuck work.</p>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:24px">
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#1F5F8B">emergency-mode · labels</p>
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Posture and labels</h3>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">An open P0 freezes the train and normal dispatch. Labels are made true, and work waiting on me is flagged</p>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#1F5F8B">doomed-run-cancel · rounds</p>
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Stop wasted work</h3>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">Cancel CI runs that can no longer pass or are out of date. Reap agent rounds that never reported back</p>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#1F5F8B">revival · reviewer · breach</p>
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Unblock and recover</h3>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">Re-ready issues when blockers close, start the review a PR is owed, fire a repair when one sits too long</p>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#1F5F8B">red-main · missing-ci-run</p>
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Watch CI</h3>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">Retry a job lost to infrastructure once, file a P0 when main goes red, start runs that never began</p>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#1F5F8B">merge · dispatch</p>
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Land and launch</h3>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">Land the next train batch, then launch agents for ready issues, within the caps</p>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#1F5F8B">promote · milestone-close</p>
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Refill and close</h3>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">Ready more groomed issues when the queue is short, open the ship PR when a milestone empties</p>
+</div>
+</div>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">A slower side loop does the housekeeping: collapsing superseded bot comments, expiring old session data, checking disk and sweeping advisories. The coordinator also redeploys itself when main changes its code.</p>
+<aside hidden>These are the 39 stages a pass runs, grouped by what they’re for and shown in the order they run. The names in blue are real stage names from the service. The first stage sets the posture: if a P0 is open, the loop goes into emergency mode, which freezes the merge train and normal dispatch. Then it makes the labels true: protected spreads from an issue to its PR, closed issues lose their ready and in-progress labels, and anything waiting on me gets needs-kbuckler so I can find it. Then it stops wasted work. If one job has already failed a run, the sibling jobs that can’t change the result are cancelled, and so are runs for a commit the PR has moved past. An agent round that posted a start and never a stop is reaped after an hour. Then it unblocks and recovers: an issue whose blockers have all closed gets ready back, a PR that’s owed a review gets one started, and a PR that has sat past its clock gets the repair or review it’s owed. If the same test fails the same way on at least three PRs, the loop files one repair issue, gives that repair the next writer slot ahead of the held PRs, and refreshes them from main once it closes. Then the CI watchdogs, in this order: runs that finished without ever reporting are flagged, a job lost to a runner or a cancellation gets one retry, main going red files a P0, and a head with no CI run gets one started. A separate hourly workflow off the coordinator’s machine also files a P0 for a red main or a starved runner fleet, so the loop isn’t the only thing watching. Only then does it merge and dispatch, in that order, so a landing frees a slot before new work is launched. The merge stage is mostly the train, which is the next slide. Last it refills the ready queue, checks whether a milestone has emptied, keeps one status comment per PR current, records how long PRs are taking and writes the beacon. Housekeeping that doesn’t affect any PR’s lifecycle runs on a separate slower loop so it can’t delay a pass: minimizing old machine comments, retention, disk checks and the advisory sweep. And the coordinator deploys itself when main changes the service, which the previous slide covered. Every stage has its own page under service/docs.</aside>
+</section>
+<section id="train" class="slide" aria-label="Slide 13: Merge train" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
 <h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA">Merge train</h2>
 <div style="display:flex;flex-direction:row;align-items:stretch;gap:24px">
 <div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:8px">
@@ -336,7 +566,7 @@ body { font-family: 'IBM Plex Sans', Arial, sans-serif; }
 <div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:8px">
 <p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">2 · BATCH</p>
 <h3 style="font-size:36px;font-weight:600;color:#F4F1EA">Combine</h3>
-<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Merged together onto current main</p>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Up to three PRs composed onto current main</p>
 </div>
 <div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:56px;height:28px;background:#D9A441"></div>
 <div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:8px">
@@ -362,9 +592,349 @@ body { font-family: 'IBM Plex Sans', Arial, sans-serif; }
 </div>
 </div>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#B9C4D6">Why it exists: on Aug 18, two green, unrelated PRs (#1072 and #1073) broke main together for about 2.5 hours (#1082).</p>
-<aside hidden>Before the train, a PR merged if it was green on its own branch. That stopped being good enough on August 18, when two PRs that were each green and had nothing to do with each other broke main as soon as both landed. Now the coordinator batches approved PRs, composes them onto current main on a loop-train ref, runs the required checks on that exact tree once, Unity included, and only then moves main. PRs aren’t refreshed against main one at a time. We looked at GitHub’s merge queue and decided to keep our own. When a batch fails, each member gets a solo run on the same main to find the culprit. Protected and path-fenced PRs can’t get on the train at all until I add merge-delegated.</aside>
+<aside hidden>Before the train, a PR merged if it was green on its own branch. That stopped being good enough on August 18, when two PRs that were each green and had nothing to do with each other broke main as soon as both landed. Now the coordinator batches approved PRs, composes them onto current main on a loop-train ref, runs the required checks on that exact tree, with Unity only when the combined tree’s Unity inputs differ from something already tested, and only then moves main. A batch is up to three PRs, and at most one batch lands per pass. PRs aren’t refreshed against main one at a time. We looked at GitHub’s merge queue and decided to keep our own. When a batch fails, each member gets a solo run on the same main to find the culprit, and the culprit gets a receipt that routes it to salvage. Protected and path-fenced PRs can’t get on the train at all until I add merge-delegated.</aside>
 </section>
-<section id="visual" class="slide" aria-label="Slide 9: Visual review" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<section id="fleet" class="slide" aria-label="Slide 14: Where it runs" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA">Where it runs</h2>
+<div style="display:grid;grid-template-columns:5fr 6fr;gap:32px">
+<div style="background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#D9A441">MACOS · LAUNCHD</p>
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">The Mac</h3>
+<ul style="font-size:28px;line-height:1.35;color:#B9C4D6">
+<li>orrery-loop, the only acting coordinator</li>
+<li>Deployed as versioned release bundles</li>
+<li>Agent worktrees, one per active PR</li>
+<li>App keys at mode 600, no token fallback</li>
+<li>The live Unity editor for hands-on QA</li>
+</ul>
+</div>
+<div style="background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#5FA8D3">BARE-METAL LINUX</p>
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">astrolabe</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Ryzen 9 3950X, 64 GB RAM, RTX 3090 rendering over Vulkan</p>
+<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px">
+<div style="flex:1;display:flex;flex-direction:column;gap:4px">
+<p style="font-size:64px;font-weight:700;line-height:1.1;color:#F4F1EA">8</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">Unity</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:4px">
+<p style="font-size:64px;font-weight:700;line-height:1.1;color:#F4F1EA">6</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">general</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:4px">
+<p style="font-size:64px;font-weight:700;line-height:1.1;color:#F4F1EA">3</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">light</p>
+</div>
+</div>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">17 runners as systemd user services. No GitHub login or API token on the box.</p>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">If a lane is paused, a GitHub-hosted job fails so nobody mistakes it for green.</p>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">Unity fills the box: 8 runners at 4 CPUs use all 32 threads, so going faster means shorter jobs.</p>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">Golden-master hashes only count when run on linux-x64.</p>
+</div>
+<aside hidden>Two machines do the work. The Mac runs the coordinator under launchd, the agent worktrees and the keys. It’s also where the live Unity editor runs when I want to look at something by hand, and where prompt evals run. Only one coordinator may act at a time. The lock is a file on that machine, so moving it means stopping the old one first. It runs from versioned release bundles and redeploys itself from main after landings, so a deploy or a rollback is a switch between bundles. astrolabe is a Linux box on the local network with a 3950X, 64 GB and a 3090, running seventeen GitHub runners: eight for Unity, six general and three light. The three inspect runners were retired on November 9. Unity jobs get four CPUs each, one Unity runner is reserved for the merge train, and a shared Unity Accelerator cache runs next to them. Eight runners at four CPUs is all 32 threads, so the box is full on Unity. Two trials showed that more CPUs per job don’t help, which leaves shorter jobs as the lever: about a third of a Unity test job is startup and teardown. Every host change gets a number, a revert condition, and reads at 6 and 24 hours. Adding the eighth Unity runner on November 8 cut the 90th-percentile wait for a Unity PR job from 27 minutes to 4, so it stayed. The hardware isn’t always the limit. At a quiet moment on November 10, 51 ready Unity issues were waiting on the coordinator’s cap of 6 Unity PRs in flight while one Unity job was running. There’s no GitHub login or API token on the box. Each runner only holds its own registration. Golden-master hashes are only authoritative on linux-x64, so that’s where they’re checked. When a lane is paused on purpose, a GitHub-hosted job fails so the pause is visible, and an hourly watchdog files a P0 if main goes red.</aside>
+</section>
+<section id="agents" class="slide" aria-label="Slide 15: Agent sessions" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:36px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Agent sessions</h2>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">An agent here is one Codex, Claude or OpenCode session per issue. The coordinator launches it with a job card, reads a session record each time it stops, and wakes the same session again for every repair.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:stretch;gap:16px">
+<div style="flex:1;background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:6px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A">1 · LAUNCH</p>
+<h3 style="font-size:28px;font-weight:600;line-height:1.2;color:#0F1626">A job card</h3>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">The coordinator fills in the brief and starts the session</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#8A5A0A"></div>
+<div style="flex:1;background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:6px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A">2 · WORK</p>
+<h3 style="font-size:28px;font-weight:600;line-height:1.2;color:#0F1626">Its own worktree</h3>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">Code, tests and the local gate, pushed to the PR</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#8A5A0A"></div>
+<div style="flex:1;background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:6px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A">3 · STOP</p>
+<h3 style="font-size:28px;font-weight:600;line-height:1.2;color:#0F1626">A session record</h3>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">One comment: how it ended and who moves next</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#8A5A0A"></div>
+<div style="flex:1;background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:6px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A">4 · WAKE</p>
+<h3 style="font-size:28px;font-weight:600;line-height:1.2;color:#0F1626">The same session</h3>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">Woken with a fresh card when its PR needs work</p>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#8A5A0A">WHAT A SESSION IS WOKEN FOR</p>
+<div style="display:grid;grid-template-columns:repeat(5, 1fr);gap:32px">
+<div style="display:flex;flex-direction:column;gap:4px;border-top:2px solid #E2DCCF;padding:16px 0px 0px 0px">
+<p style="font-size:28px;font-weight:600;color:#0F1626">Implement</p>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">A ready issue, taken to a PR that’s ready for review</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px;border-top:2px solid #E2DCCF;padding:16px 0px 0px 0px">
+<p style="font-size:28px;font-weight:600;color:#0F1626">Salvage</p>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">Its PR stalled or went red: finish, fix or close it</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px;border-top:2px solid #E2DCCF;padding:16px 0px 0px 0px">
+<p style="font-size:28px;font-weight:600;color:#0F1626">Conflict</p>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">Its PR clashes with main</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px;border-top:2px solid #E2DCCF;padding:16px 0px 0px 0px">
+<p style="font-size:28px;font-weight:600;color:#0F1626">Respond</p>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">A review asked for changes</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px;border-top:2px solid #8A5A0A;padding:16px 0px 0px 0px">
+<p style="font-size:28px;font-weight:600;color:#0F1626">Review</p>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">A separate agent, with one verdict per round</p>
+</div>
+</div>
+</div>
+<h3 style="font-size:36px;font-weight:600;color:#8A5A0A">Sessions never talk to each other. Everything between them goes through GitHub.</h3>
+<aside hidden>Now the bottom layer, the agents the loop launches. An agent in this system is one model session per issue, on Codex, Claude or OpenCode, and the coordinator picks which. The life of a session goes round these four steps. The coordinator fills in a job card, which is the brief, and launches the session on the Mac. The session works in its own worktree: it writes the code and the tests, runs the local gate and pushes to the PR’s branch. When it’s done, or stuck, it runs one command that posts a session record, a single comment saying how it ended, what it verified and who should move next. The next pass reads that record and classifies the PR. If the PR then needs more work, the coordinator wakes the same session with a fresh job card, so it keeps what it already learned. That last part is new. Until November 10, salvage, conflict and respond were separate modes with their own prompts. Now they’re all a wake of the issue’s one session, and the bottom row is the reasons it gets woken: its PR stalled or went red, it clashes with main, or a review asked for changes. Review is the exception. It’s an independent agent that reviews the exact head, screenshots included, and gives one verdict per round, and its findings are verified before they count. Sessions never talk to each other. Everything between them goes through GitHub. Repair is a big share of the work. Last week 45% of sessions were repairs, and a merged PR took 3.2 sessions on average. Next is what every session builds against, and then the two ends of a session: the job card it starts with and the record it ends with.</aside>
+</section>
+<section id="frameworks" class="slide" aria-label="Slide 16: Standing frameworks" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:24px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA">Standing frameworks</h2>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Agents don’t invent taste or architecture per PR. They build against documents I ratified up front. Lint and tests hold that floor, and look reviews and live play find what it doesn’t encode.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;flex-direction:row;gap:24px;padding:0px 26px">
+<p style="width:290px;flex:none;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#D9A441">FRAMEWORK</p>
+<p style="width:330px;flex:none;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#D9A441">WHERE</p>
+<p style="flex:1;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#D9A441">WHAT IT RULES</p>
+<p style="width:380px;flex:none;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#D9A441">CHECKED BY</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:center;gap:24px;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:12px 24px">
+<p style="width:290px;flex:none;font-size:28px;font-weight:600;white-space:nowrap;color:#F4F1EA">Design pillars</p>
+<p style="width:330px;flex:none;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">docs/DESIGN.md</p>
+<p style="flex:1;font-size:24px;line-height:1.35;color:#B9C4D6">What the game is: five pillars, anti-pillars and about 320 recorded decisions</p>
+<p style="width:380px;flex:none;font-size:24px;line-height:1.35;color:#F4F1EA">Review, and my ruling on any new decision record</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:center;gap:24px;background:#18223A;border:2px solid #D9A441;border-radius:16px;padding:12px 24px">
+<p style="width:290px;flex:none;font-size:28px;font-weight:600;white-space:nowrap;color:#F4F1EA">Design system</p>
+<p style="width:330px;flex:none;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">docs/DESIGN-SYSTEM.md</p>
+<p style="flex:1;font-size:24px;line-height:1.35;color:#B9C4D6">Pixels: about 60 numbered rules for color, type, spacing, motion, states and accessibility</p>
+<p style="width:380px;flex:none;font-size:24px;line-height:1.35;color:#F4F1EA">Lint, tests and visual review</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:center;gap:24px;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:12px 24px">
+<p style="width:290px;flex:none;font-size:28px;font-weight:600;white-space:nowrap;color:#F4F1EA">Writing guide</p>
+<p style="width:330px;flex:none;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">docs/WRITING.md</p>
+<p style="flex:1;font-size:24px;line-height:1.35;color:#B9C4D6">Words: the voice and terms for everything the player reads</p>
+<p style="width:380px;flex:none;font-size:24px;line-height:1.35;color:#F4F1EA">A copy test in the sim suite</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:center;gap:24px;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:12px 24px">
+<p style="width:290px;flex:none;font-size:28px;font-weight:600;white-space:nowrap;color:#F4F1EA">Art direction</p>
+<p style="width:330px;flex:none;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">docs/ART-DIRECTION.md</p>
+<p style="flex:1;font-size:24px;line-height:1.35;color:#B9C4D6">The rendered world: physically based, with hard sci-fi ships and stations</p>
+<p style="width:380px;flex:none;font-size:24px;line-height:1.35;color:#F4F1EA">Criteria files and visual review</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:center;gap:24px;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:12px 24px">
+<p style="width:290px;flex:none;font-size:28px;font-weight:600;white-space:nowrap;color:#F4F1EA">Architecture</p>
+<p style="width:330px;flex:none;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">docs/ARCHITECTURE.md</p>
+<p style="flex:1;font-size:24px;line-height:1.35;color:#B9C4D6">Code shape: the sim and Unity split, ticks, determinism and the data pipeline</p>
+<p style="width:380px;flex:none;font-size:24px;line-height:1.35;color:#F4F1EA">Banned-API analyzers and golden-master hashes</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:center;gap:24px;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:12px 24px">
+<p style="width:290px;flex:none;font-size:28px;font-weight:600;white-space:nowrap;color:#F4F1EA">Constitution</p>
+<p style="width:330px;flex:none;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">AGENTS.md</p>
+<p style="flex:1;font-size:24px;line-height:1.35;color:#B9C4D6">Nine hard rules and the engineering principles behind them</p>
+<p style="width:380px;flex:none;font-size:24px;line-height:1.35;color:#F4F1EA">A tag on each rule: code, judgment or both</p>
+</div>
+</div>
+<aside hidden>Before any session starts, most of the hard questions have already been answered in writing. These are the documents an agent builds against, and I ratified each of them before the work it governs began. DESIGN.md says what the game is: the five pillars every feature has to argue against, the anti-pillars that are simply out, and the index of about 320 recorded decisions. The design system is the one I’d point to first. It’s the source of truth for the interface, and its floor is 63 numbered rules in 13 families, things like token-only colors, type sizes, spacing, motion, interaction states and an accessibility floor. Each rule has a stable id, a predicate you can measure where one exists, and a named place it’s enforced: 21 name a lint, 15 a test, 13 a capture check and 37 lean on review, and many have more than one. The rest of that document is guidance, and it’s marked as guidance so nobody treats it as a merge gate. In practice lint and tests reliably hold what they encode, like token literals, contrast and copy rules. PR review only blocks what a PR breaks on its declared screenshots, which are mostly day-one scenes. So most of what gets caught beyond the floor comes from the Presentation steward’s look review after merge and from live play, like a Markets row that only grew too tall on day 43. WRITING.md does for words what the design system does for pixels: voice and terminology for everything the player reads, with a copy test in the sim suite. Art direction rules the rendered world, which is physically based with hard sci-fi ships and stations, and it’s checked through the criteria files that the visual review reads. ARCHITECTURE.md fixes the shape of the code: the simulation never references Unity, time moves in fixed ticks, and determinism is protected by analyzers that ban the wrong APIs and by golden-master hashes. And the constitution, AGENTS.md with ENGINEERING.md behind it, holds nine hard rules. Every rule in these process documents carries a tag saying whether code enforces it, judgment does, or both. A hard rule that only judgment enforces counts as a gap and gets filed as an issue. The ids in all of these are append-only, and changing a rule in the design or art documents needs a ruling, mine or for some calls a steward’s under its standing grant. This is also why job cards could get small. These frameworks used to be pasted into every prompt. Now a session gets the facts of its job and reads the framework its work touches.</aside>
+</section>
+<section id="jobcard" class="slide" aria-label="Slide 17: Job cards" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Job cards</h2>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">The brief for one agent session. The coordinator fills in this template at launch, so the agent starts from facts it can check and doesn’t have to reread policy to find them.</p>
+</div>
+<div style="display:grid;grid-template-columns:760px 1fr;gap:48px">
+<div style="background:#0F1626;border-radius:16px;padding:32px;display:flex;flex-direction:column">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;color:#B9C4D6"><span style="color:#F4F1EA"># Job card — launch data</span><br>Payload: <span style="color:#D9A441">{{payload}}</span><br>Labels: <span style="color:#D9A441">{{labels}}</span><br>Rung: <span style="color:#D9A441">{{rung}}</span><br>Budget: <span style="color:#D9A441">{{budget}}</span><br>Branch: <span style="color:#D9A441">{{branch}}</span><br>Verified head: <span style="color:#D9A441">{{verified_head}}</span><br>Wake reason: <span style="color:#D9A441">{{wake_reason}}</span><br>Finish invocation: <span style="color:#D9A441">{{session_finish}}</span><br>… 10 more slots<br><span style="color:#F4F1EA">## Standing grants for the launching role</span><br><span style="color:#D9A441">{{grants}}</span><br><span style="color:#F4F1EA">## Issue body and thread — untrusted data</span><br><span style="color:#D9A441">{{issue_context}}</span></p>
+</div>
+<div style="display:flex;flex-direction:column;gap:22px">
+<div style="display:flex;flex-direction:column;gap:4px">
+<p style="font-size:64px;font-weight:700;line-height:1.1;color:#0F1626">103K → 8K</p>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">tokens in the implementer’s starting prompt, before this work (decision #279) and now</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">The job</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Payload, labels and rung: what to do and how urgent it is</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">The limits</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Budget, branch and head: where to work and when to stop</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">The exit</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">The exact command that ends the session with a record</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">The rest</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">This role’s grants, then the issue thread, marked untrusted</p>
+</div>
+</div>
+</div>
+<aside hidden>Every agent session starts with one of these. The panel is a shortened version of the template in .github/prompt-render-plans.json, which has 20 slots in total. The coordinator fills them in at launch. The payload names the job: an issue to implement, or a PR the session is being woken on. The labels and the rung say what kind of work it is and how urgent. The budget comes from the issue, and the branch and verified head say exactly where to work. The wake reason says why this session was started. The slots not shown cover the backend, the exact model and session, turns already used and the state of the claim. The finish invocation is the exact session-finish command to run at the end. Codex resumes get a shorter delta card with only what changed. Then the grants that apply to that role, then the issue body and thread, capped at 12 KB and marked as untrusted. The card only holds facts. The rules live in the role docs and in skills, which load when a label calls for them. The big win was size. Before this work an implementer read about 103K tokens of policy before it even looked at its issue, and paid for that prefix on every call. Today the assembled prompt is about 7.9K tokens on Claude and 8.2K on Codex. The older figure includes the project instructions and the issue thread, so it isn’t a perfect like-for-like, but it’s close.</aside>
+</section>
+<section id="record" class="slide" aria-label="Slide 18: Session records" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA">Session records</h2>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">The last thing every session does. One comment tells the coordinator how the session ended, what it verified and who moves next, and the next pass acts on it.</p>
+</div>
+<div style="display:grid;grid-template-columns:7fr 8fr;gap:48px">
+<div style="background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:32px;display:flex;flex-direction:column">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:0.5px;color:#F4F1EA"><span style="color:#D9A441">&lt;!-- orrery-session-record v1 --&gt;</span><br>{<br>&#160;&#160;<span style="color:#5FA8D3">"schema"</span>: "orrery.session-record/1",<br>&#160;&#160;<span style="color:#5FA8D3">"attempt"</span>: "cx_done",<br>&#160;&#160;<span style="color:#5FA8D3">"session"</span>: "cx_done",<br>&#160;&#160;<span style="color:#5FA8D3">"role"</span>: "implementer",<br>&#160;&#160;<span style="color:#5FA8D3">"target"</span>: "pr:41",<br>&#160;&#160;<span style="color:#5FA8D3">"outcome"</span>: "done",<br>&#160;&#160;<span style="color:#5FA8D3">"head"</span>: "0123456789abcdef…",<br>&#160;&#160;<span style="color:#5FA8D3">"next"</span>: { <span style="color:#5FA8D3">"actor"</span>: "reviewer",<br>&#160;&#160;&#160;&#160;<span style="color:#5FA8D3">"step"</span>: "review the ready head" },<br>&#160;&#160;<span style="color:#5FA8D3">"validation"</span>: { <span style="color:#5FA8D3">"local_gate"</span>: "passed" },<br>&#160;&#160;<span style="color:#5FA8D3">"usage"</span>: { <span style="color:#5FA8D3">"input"</span>: 1200, <span style="color:#5FA8D3">"cached"</span>: 800,<br>&#160;&#160;&#160;&#160;<span style="color:#5FA8D3">"output"</span>: 300 }<br>}</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:24px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">orrery.session-record/1</p>
+<h3 style="font-size:36px;font-weight:600;line-height:1.2;color:#F4F1EA">Replaced nine handoff formats</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">One comment holding one JSON object. The posting helper and the coordinator both validate it (decision #248).</p>
+</div>
+<div style="display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:12px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#B9C4D6;padding:8px 8px 8px 0px">outcome</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F4F1EA;background:#18223A;border:2px solid #2B3A55;padding:8px 18px;border-radius:24px">done</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F4F1EA;background:#18223A;border:2px solid #2B3A55;padding:8px 18px;border-radius:24px">blocked</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F4F1EA;background:#18223A;border:2px solid #2B3A55;padding:8px 18px;border-radius:24px">stood-down</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F4F1EA;background:#18223A;border:2px solid #2B3A55;padding:8px 18px;border-radius:24px">failed</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F4F1EA;background:#18223A;border:2px solid #2B3A55;padding:8px 18px;border-radius:24px">needs-maintainer</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F4F1EA;background:#18223A;border:2px solid #2B3A55;padding:8px 18px;border-radius:24px">closed</p>
+</div>
+<ul style="font-size:28px;line-height:1.35;color:#B9C4D6">
+<li>Only accepted if attempt, session, role and target match a real launch</li>
+<li>blocked needs a blocker, needs-maintainer needs a question, and done on a PR needs its head</li>
+<li>Unknown fields are rejected, and the Python and C# sides share test fixtures</li>
+</ul>
+</div>
+</div>
+<aside hidden>This is how a session tells the coordinator it’s done. We had nine different text formats for handoffs, all parsed separately, and they drifted. Now every session ends by running tools/session-finish, which posts one comment with a marker line and a JSON block like this one, shortened from a test fixture. Status: the slide shows where this ends up under #8273. Today the coordinator still falls back to the old text stop lines until #8901 lands, and the launch receipt that replaces the start marker is #8803. The coordinator only trusts a record if it matches a launch it actually made, so a stray comment can’t pass itself off as a handoff. The fields replace the old text conventions: next says who moves next, awaiting_run is for waiting on a CI run, blockers and question are for parking, and usage feeds the spend numbers. The Python helper and the C# parser are tested against the same set of good and bad examples.</aside>
+</section>
+<section id="spend" class="slide" aria-label="Slide 19: Where the tokens go" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Where the tokens go</h2>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">One week of Codex sessions, from the November 8 audit. Context that gets reread on every turn is most of the bill.</p>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
+<div style="display:flex;flex-direction:column;gap:4px">
+<p style="font-size:112px;font-weight:700;line-height:1.1;color:#0F1626">16.75B</p>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Codex tokens in one week, across 1,353 sessions</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<p style="font-size:112px;font-weight:700;line-height:1.1;color:#0F1626">98.7%</p>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">of input tokens were cache reads</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<p style="font-size:112px;font-weight:700;line-height:1.1;color:#0F1626">7%</p>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">of sessions used 51% of all tokens</p>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:48px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600;color:#8A5A0A">What drove it</h3>
+<ul style="font-size:28px;line-height:1.35;color:#3E4756">
+<li>Large sessions re-read 150–254K tokens of context every turn</li>
+<li>Compaction didn’t kick in until about 500K</li>
+<li>One salvage session burned 457M tokens over 1,957 turns</li>
+</ul>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600;color:#8A5A0A">Changes on Nov 8, and the result</h3>
+<ul style="font-size:28px;line-height:1.35;color:#3E4756">
+<li>Compaction starts at 150K tokens, with effort set to low</li>
+<li>A per-session token ceiling (#12322) and budgets recalibrated from recent receipts (#12323)</li>
+<li>A day later: tokens per merged PR down 44%, from 37.5M to 21.1M. No rollback trigger tripped, so the change stayed</li>
+</ul>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#3E4756">Source: docs/audits/2026-11-08-codex-spend-and-estimates.md · Codex rollouts Nov 1–8</p>
+<aside hidden>Numbers from the November 8 spend audit. Almost all of the input is cached, but the cached reads still dominate the bill because the context is huge: the biggest sessions were re-reading 150 to 250 thousand tokens on every turn for hundreds or thousands of turns, and compaction only started near the 500K limit. A handful of runaway sessions account for half the spend; the worst was one salvage at 457 million tokens. Terra, the cheaper Codex tier, did fine on trivial issues, completing 96% of them at a median of 6.6 million tokens each, but we haven’t tried it on standard work yet. On November 8 we lowered the compaction point to 150K, set effort explicitly, added a per-session token ceiling and recalibrated budgets from every recent receipt, since about a third of merged PRs go over their estimate. All of that merged the same day. The compaction change had rollback triggers agreed in advance: first-pass merges under 50% on the 24-hour rate, more than one salvage per merged PR, or any session failing at compaction. The 24-hour read came back with tokens per merged PR down from 37.5 million to 21.1 million, first-pass at 57.1% against 54.2% before, salvages unchanged at 0.8, and 143 compactions with none failing. Nothing tripped, so the settings stayed. Those first-pass figures are 24-hour rates, which run lower than the weekly figure later in the deck.</aside>
+</section>
+<section id="models" class="slide" aria-label="Slide 20: Model selection" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Model selection</h2>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">No role is tied to one model. Pins move with what the work needs and what the subscriptions have left, and stewards test each change before it sticks.</p>
+</div>
+<div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:48px">
+<div style="display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;flex-direction:column;gap:4px">
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Capability</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">A complexity label picks the tier. On Nov 10, Codex ran Sol for most work, Terra for trivial issues and Luna for review replies, and Claude Sonnet did most reviews.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Spend</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Stewards watch the Codex and Claude usage windows. Codex goes first today, and when its weekly window hits 100% Claude takes the new work.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Testing a change</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Rollback triggers are agreed first. Then a 24-hour read against the day before on tokens per merged PR, first-pass rate and salvages.</p>
+</div>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#8A5A0A">TRIALS STEWARDS HAVE RUN</p>
+<div style="display:flex;flex-direction:row;gap:24px;border-top:2px solid #E2DCCF;padding:14px 0px 0px 0px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A;width:150px;flex:none">Oct 23–26</p>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">Claims alternated between Codex and Claude by issue number, compared on turns and tokens per merged PR</p>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px;border-top:2px solid #E2DCCF;padding:14px 0px 0px 0px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A;width:150px;flex:none">Oct 27</p>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">Three pins moved to cheaper models behind a canary: revert if fewer than 70% of attempts complete</p>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px;border-top:2px solid #E2DCCF;padding:14px 0px 0px 0px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A;width:150px;flex:none">Nov 1–8</p>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">Terra on trivial work: 96% of issues completed, at a median 6.6M tokens each</p>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px;border-top:2px solid #E2DCCF;padding:14px 0px 0px 0px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A;width:150px;flex:none">Nov 8–9</p>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">Compaction at 150K tokens cut tokens per merged PR by 44% in a day. No rollback trigger tripped, so it stayed</p>
+</div>
+</div>
+</div>
+<aside hidden>Nothing about model choice is fixed. Every role has a pin, and the pins change for two reasons. One is capability: grooming puts a complexity label on each issue, and that picks the tier, so trivial work goes to a cheaper model and hard work, review and judgment calls stay on the strongest ones. Early in November on Codex that meant Terra for trivial issues and Sol for the rest. The other reason is spend. The loop runs on subscriptions with weekly windows, so stewards track how much of each window is left and move load between Codex and Claude. If a backend runs out mid-week, its lane fails over to the next one in the list. Changing a pin is a settings edit that the coordinator picks up on its next pass, with no restart. And changes get tested. In late October claims alternated between backends by issue number for 58 hours so the two lanes could be compared on turns, recovery and tokens per merged PR. On October 27 three pins moved to cheaper models behind a canary with a written revert rule. The November 8 audit measured Terra on trivial work and set compaction at 150K. The method is always the same. Rollback triggers are agreed with me before the change and the baseline is recorded. After 24 hours the steward compares tokens per merged PR, first-pass merge rate and salvages per PR against the day before. If a trigger trips, the change is reverted, and outages or other confounders are named in the read. The compaction trial cut tokens per merged PR from 37.5 million to 21.1 million with first-pass steady at 57%, so it stayed. As of November 10 the order is Codex first with Claude as failover. Sol does most implementation, conflict repair and salvage, Terra takes trivial issues, Luna handles review replies, and Claude Sonnet did most of the day’s reviews. When Codex’s weekly window reaches 100%, Claude moves to the front for new work.</aside>
+</section>
+<section id="evals" class="slide" aria-label="Slide 21: Prompt evals" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA">Prompt evals</h2>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Before a prompt change is trusted, it runs against situations that went wrong before and is graded on what the agent did.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:stretch;gap:24px">
+<div style="flex:none;width:420px;display:flex;flex-direction:column;gap:16px">
+<div style="background:#18223A;border:2px solid #2B3A55;border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:4px">
+<p style="font-size:28px;font-weight:600;color:#F4F1EA">Baseline</p>
+<p style="font-size:24px;color:#B9C4D6">prompts on main</p>
+</div>
+<div style="background:#18223A;border:2px solid #2B3A55;border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:4px">
+<p style="font-size:28px;font-weight:600;color:#F4F1EA">Candidate</p>
+<p style="font-size:24px;color:#B9C4D6">prompts from the PR</p>
+</div>
+<div style="background:#18223A;border:2px solid #2B3A55;border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:4px">
+<p style="font-size:28px;font-weight:600;color:#F4F1EA">Weakened control</p>
+<p style="font-size:24px;color:#B9C4D6">policy removed, should fail</p>
+</div>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:56px;height:28px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:28px;display:flex;flex-direction:column;justify-content:center;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">PROMPTFOO · OPENCODE</p>
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">Isolated trials</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">A clean home and workspace for each trial. The model only gets fake tools that log every call, with no shell or network.</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:56px;height:28px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:28px;display:flex;flex-direction:column;justify-content:center;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">GRADING</p>
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">Graded from the log</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Scores come from what the tools logged, not from what the model says it did.</p>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">Fixtures come from real incidents: false done, duplicate claims, stale reviews, truncated output and prompt injection.</p>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">Each study is planned up front: three windows, at least 20 samples per cell, and a $15 budget.</p>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">Results are advisory. Studies run on demand on the Mac, never in CI.</p>
+</div>
+<aside hidden>This is how we test a prompt change before trusting it. The harness in tools/prompt-eval runs the same situation three ways: with the prompts on main, with the prompts from the PR, and with a deliberately weakened prompt that should fail. If the weakened one passes, the fixture isn’t testing anything. Each trial gets a clean environment, and the model can only call fake tools that log what it did. Grading reads that log, so a model that claims it did the right thing but didn’t still fails. Fixtures come from things that actually went wrong in production, including prompt-injection attempts planted in issue text, comments and logs. Studies are planned in advance with fixed sample sizes and a budget, and the results are advisory for now.</aside>
+</section>
+<section id="visual" class="slide" aria-label="Slide 22: Visual review" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
 <div style="display:flex;flex-direction:column;gap:16px">
 <h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA">Visual review</h2>
 <p style="font-size:28px;line-height:1.35;color:#B9C4D6">Screenshots are judged as part of code review. The agent looks at the pixels before it reads the PR’s own claims.</p>
@@ -415,186 +985,9 @@ body { font-family: 'IBM Plex Sans', Arial, sans-serif; }
 </div>
 </div>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#B9C4D6">Criteria live in game/VisualCriteria: about 290 files, one per capture family, plus a shared rubric · decision #11035</p>
-<aside hidden>This is how the loop reviews how the game looks. A PR that touches the game declares its Unity scope in the body: which tests to run and which screenshots it wants judged, twelve at most. CI runs those playmode tests on astrolabe’s 3090 and uploads the captures to R2, and one sticky comment on the PR links them. Before the review agent starts, the coordinator checks that the screenshot report belongs to this exact head, then hands the agent every declared PNG at full size along with its criteria file, any reference images and main’s version of the same shot. The agent looks at the pixels first and the PR’s description second, and its findings go into the same review verdict as the code. What blocks is narrow: broken rendering, a world that isn’t plausible, a violation of the UI design floor, or a FAIL condition written in that capture’s criteria file, and only when this PR introduced it. Main is used to decide who caused a defect, never whether it’s acceptable. Anything measurable has to come with a pixel probe result, or it’s advisory. Taste, genre and inherited defects never block. They become advisory issues, and inherited ones are collected in one ledger issue per capture family. A blocking-grade defect that’s already on main doesn’t hold the PR, but it gets filed at P1. Only models on the vision allowlist may judge captures. If none is available, the review waits instead of approving blind. This replaced a separate visual inspector job under decision #11035.</aside>
+<aside hidden>That’s the three layers. What’s left is the feedback path, the arrow on the right of the architecture diagram, and it starts inside a PR. This is how the loop reviews how the game looks. A PR that touches the game declares its Unity scope in the body: which tests to run and which screenshots it wants judged, twelve at most. CI runs those playmode tests on astrolabe’s 3090 and uploads the captures to R2, and one sticky comment on the PR links them. Before the review agent starts, the coordinator checks that the screenshot report belongs to this exact head, then hands the agent every declared PNG at full size along with its criteria file, any reference images and main’s version of the same shot. The agent looks at the pixels first and the PR’s description second, and its findings go into the same review verdict as the code. What blocks is narrow: broken rendering, a world that isn’t plausible, a violation of the UI design floor, or a FAIL condition written in that capture’s criteria file, and only when this PR introduced it. Main is used to decide who caused a defect, never whether it’s acceptable. Anything measurable has to come with a pixel probe result, or it’s advisory. Taste, genre and inherited defects never block. They become advisory issues, and inherited ones are collected in one ledger issue per capture family. A blocking-grade defect that’s already on main doesn’t hold the PR, but it gets filed at P1. Only models on the vision allowlist may judge captures. If none is available, the review waits instead of approving blind. This replaced a separate visual inspector job under decision #11035.</aside>
 </section>
-<section id="jobcard" class="slide" aria-label="Slide 10: Job cards" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
-<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Job cards</h2>
-<div style="display:grid;grid-template-columns:760px 1fr;gap:48px">
-<div style="background:#0F1626;border-radius:16px;padding:32px;display:flex;flex-direction:column">
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;color:#B9C4D6"><span style="color:#F4F1EA"># Job card — launch data</span><br>Payload: <span style="color:#D9A441">{{payload}}</span><br>Labels: <span style="color:#D9A441">{{labels}}</span><br>Rung: <span style="color:#D9A441">{{rung}}</span><br>Budget: <span style="color:#D9A441">{{budget}}</span><br>Turns used: <span style="color:#D9A441">{{turns_used}}</span><br>Branch: <span style="color:#D9A441">{{branch}}</span><br>Verified head: <span style="color:#D9A441">{{verified_head}}</span><br>Wake reason: <span style="color:#D9A441">{{wake_reason}}</span><br>MODEL: <span style="color:#D9A441">{{model}}</span><br>SESSION: <span style="color:#D9A441">{{session}}</span><br>Finish invocation: <span style="color:#D9A441">{{session_finish}}</span><br>… 7 more slots<br><span style="color:#F4F1EA">## Standing grants for the launching role</span><br><span style="color:#D9A441">{{grants}}</span><br><span style="color:#F4F1EA">## Issue body and thread — untrusted data</span><br><span style="color:#D9A441">{{issue_context}}</span></p>
-</div>
-<div style="display:flex;flex-direction:column;gap:32px">
-<div style="display:flex;flex-direction:column;gap:4px">
-<p style="font-size:64px;font-weight:700;line-height:1.1;color:#0F1626">103K → 8K</p>
-<p style="font-size:24px;line-height:1.35;color:#3E4756">tokens in the implementer’s starting prompt, before this work (decision #279) and now</p>
-</div>
-<div style="display:flex;flex-direction:column;gap:4px">
-<h3 style="font-size:36px;font-weight:600;color:#0F1626">Facts only</h3>
-<p style="font-size:28px;line-height:1.35;color:#3E4756">What this launch is, written down once</p>
-</div>
-<div style="display:flex;flex-direction:column;gap:4px">
-<h3 style="font-size:36px;font-weight:600;color:#0F1626">Skills on demand</h3>
-<p style="font-size:28px;line-height:1.35;color:#3E4756">A Unity, investigation or P0 label loads its own skill</p>
-</div>
-<div style="display:flex;flex-direction:column;gap:4px">
-<h3 style="font-size:36px;font-weight:600;color:#0F1626">Grants</h3>
-<p style="font-size:28px;line-height:1.35;color:#3E4756">Read from .github/grants.json for this role</p>
-</div>
-<div style="display:flex;flex-direction:column;gap:4px">
-<h3 style="font-size:36px;font-weight:600;color:#0F1626">Same renderer</h3>
-<p style="font-size:28px;line-height:1.35;color:#3E4756">The eval harness renders the same card</p>
-</div>
-</div>
-</div>
-<aside hidden>Every agent session starts with one of these. The panel is a shortened version of the template in .github/prompt-render-plans.json, which has 20 slots in total. The coordinator fills them in at launch: the payload, labels, priority, budget and turns used, branch and verified head, why it was woken, the exact model and session, and the exact session-finish command to run at the end. Codex resumes get a shorter delta card with only what changed. Then the grants that apply to that role, then the issue body and thread, capped at 12 KB and marked as untrusted. The card only holds facts. The rules live in the role docs and in skills, which load when a label calls for them. The big win was size. Before this work an implementer read about 103K tokens of policy before it even looked at its issue, and paid for that prefix on every call. Today the assembled prompt is about 7.9K tokens on Claude and 8.2K on Codex. The older figure includes the project instructions and the issue thread, so it isn’t a perfect like-for-like, but it’s close.</aside>
-</section>
-<section id="record" class="slide" aria-label="Slide 11: Session records" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
-<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA">Session records</h2>
-<div style="display:grid;grid-template-columns:7fr 8fr;gap:48px">
-<div style="background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:32px;display:flex;flex-direction:column">
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:0.5px;color:#F4F1EA"><span style="color:#D9A441">&lt;!-- orrery-session-record v1 --&gt;</span><br>{<br>&#160;&#160;<span style="color:#5FA8D3">"schema"</span>: "orrery.session-record/1",<br>&#160;&#160;<span style="color:#5FA8D3">"attempt"</span>: "cx_done",<br>&#160;&#160;<span style="color:#5FA8D3">"session"</span>: "cx_done",<br>&#160;&#160;<span style="color:#5FA8D3">"role"</span>: "implementer",<br>&#160;&#160;<span style="color:#5FA8D3">"target"</span>: "pr:41",<br>&#160;&#160;<span style="color:#5FA8D3">"outcome"</span>: "done",<br>&#160;&#160;<span style="color:#5FA8D3">"head"</span>: "0123456789abcdef…",<br>&#160;&#160;<span style="color:#5FA8D3">"next"</span>: { <span style="color:#5FA8D3">"actor"</span>: "reviewer",<br>&#160;&#160;&#160;&#160;<span style="color:#5FA8D3">"step"</span>: "review the ready head" },<br>&#160;&#160;<span style="color:#5FA8D3">"validation"</span>: { <span style="color:#5FA8D3">"local_gate"</span>: "passed" },<br>&#160;&#160;<span style="color:#5FA8D3">"usage"</span>: { <span style="color:#5FA8D3">"input"</span>: 1200, <span style="color:#5FA8D3">"cached"</span>: 800,<br>&#160;&#160;&#160;&#160;<span style="color:#5FA8D3">"output"</span>: 300 }<br>}</p>
-</div>
-<div style="display:flex;flex-direction:column;gap:24px">
-<div style="display:flex;flex-direction:column;gap:8px">
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">orrery.session-record/1</p>
-<h3 style="font-size:36px;font-weight:600;line-height:1.2;color:#F4F1EA">Replaced nine handoff formats</h3>
-<p style="font-size:28px;line-height:1.35;color:#B9C4D6">One comment holding one JSON object. The posting helper and the coordinator both validate it (decision #248).</p>
-</div>
-<div style="display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:12px">
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#B9C4D6;padding:8px 8px 8px 0px">outcome</p>
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F4F1EA;background:#18223A;border:2px solid #2B3A55;padding:8px 18px;border-radius:24px">done</p>
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F4F1EA;background:#18223A;border:2px solid #2B3A55;padding:8px 18px;border-radius:24px">blocked</p>
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F4F1EA;background:#18223A;border:2px solid #2B3A55;padding:8px 18px;border-radius:24px">stood-down</p>
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F4F1EA;background:#18223A;border:2px solid #2B3A55;padding:8px 18px;border-radius:24px">failed</p>
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F4F1EA;background:#18223A;border:2px solid #2B3A55;padding:8px 18px;border-radius:24px">needs-maintainer</p>
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F4F1EA;background:#18223A;border:2px solid #2B3A55;padding:8px 18px;border-radius:24px">closed</p>
-</div>
-<ul style="font-size:28px;line-height:1.35;color:#B9C4D6">
-<li>Only accepted if attempt, session, role and target match a real launch</li>
-<li>blocked needs a blocker, needs-maintainer needs a question, and done on a PR needs its head</li>
-<li>Unknown fields are rejected, and the Python and C# sides share test fixtures</li>
-</ul>
-</div>
-</div>
-<aside hidden>This is how a session tells the coordinator it’s done. We had nine different text formats for handoffs, all parsed separately, and they drifted. Now every session ends by running tools/session-finish, which posts one comment with a marker line and a JSON block like this one, shortened from a test fixture. Status: the slide shows where this ends up under #8273. Today the coordinator still falls back to the old text stop lines until #8901 lands, and the launch receipt that replaces the start marker is #8803. The coordinator only trusts a record if it matches a launch it actually made, so a stray comment can’t pass itself off as a handoff. The fields replace the old text conventions: next says who moves next, awaiting_run is for waiting on a CI run, blockers and question are for parking, and usage feeds the spend numbers. The Python helper and the C# parser are tested against the same set of good and bad examples.</aside>
-</section>
-<section id="models" class="slide" aria-label="Slide 12: Model selection" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
-<div style="display:flex;flex-direction:column;gap:16px">
-<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Model selection</h2>
-<p style="font-size:28px;line-height:1.35;color:#3E4756">No role is tied to one model. Pins move with what the work needs and what the subscriptions have left, and stewards test each change before it sticks.</p>
-</div>
-<div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:48px">
-<div style="display:flex;flex-direction:column;gap:28px">
-<div style="display:flex;flex-direction:column;gap:4px">
-<h3 style="font-size:36px;font-weight:600;color:#0F1626">Capability</h3>
-<p style="font-size:28px;line-height:1.35;color:#3E4756">A complexity label picks the tier. On Nov 10, Codex ran Sol for most work, Terra for trivial issues and Luna for review replies, and Claude Sonnet did most reviews.</p>
-</div>
-<div style="display:flex;flex-direction:column;gap:4px">
-<h3 style="font-size:36px;font-weight:600;color:#0F1626">Spend</h3>
-<p style="font-size:28px;line-height:1.35;color:#3E4756">Stewards watch the Codex and Claude usage windows. Codex goes first today, and when its weekly window hits 100% Claude takes the new work.</p>
-</div>
-<div style="display:flex;flex-direction:column;gap:4px">
-<h3 style="font-size:36px;font-weight:600;color:#0F1626">Testing a change</h3>
-<p style="font-size:28px;line-height:1.35;color:#3E4756">Rollback triggers are agreed first. Then a 24-hour read against the day before on tokens per merged PR, first-pass rate and salvages.</p>
-</div>
-</div>
-<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:16px">
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#8A5A0A">TRIALS STEWARDS HAVE RUN</p>
-<div style="display:flex;flex-direction:row;gap:24px;border-top:2px solid #E2DCCF;padding:14px 0px 0px 0px">
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A;width:150px;flex:none">Oct 23–26</p>
-<p style="font-size:24px;line-height:1.35;color:#3E4756">Claims alternated between Codex and Claude by issue number, compared on turns and tokens per merged PR</p>
-</div>
-<div style="display:flex;flex-direction:row;gap:24px;border-top:2px solid #E2DCCF;padding:14px 0px 0px 0px">
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A;width:150px;flex:none">Oct 27</p>
-<p style="font-size:24px;line-height:1.35;color:#3E4756">Three pins moved to cheaper models behind a canary: revert if fewer than 70% of attempts complete</p>
-</div>
-<div style="display:flex;flex-direction:row;gap:24px;border-top:2px solid #E2DCCF;padding:14px 0px 0px 0px">
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A;width:150px;flex:none">Nov 1–8</p>
-<p style="font-size:24px;line-height:1.35;color:#3E4756">Terra on trivial work: 96% of issues completed, at a median 6.6M tokens each</p>
-</div>
-<div style="display:flex;flex-direction:row;gap:24px;border-top:2px solid #E2DCCF;padding:14px 0px 0px 0px">
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A;width:150px;flex:none">Nov 8–9</p>
-<p style="font-size:24px;line-height:1.35;color:#3E4756">Compaction at 150K tokens cut tokens per merged PR by 44% in a day. No rollback trigger tripped, so it stayed</p>
-</div>
-</div>
-</div>
-<aside hidden>Nothing about model choice is fixed. Every role has a pin, and the pins change for two reasons. One is capability: grooming puts a complexity label on each issue, and that picks the tier, so trivial work goes to a cheaper model and hard work, review and judgment calls stay on the strongest ones. Early in November on Codex that meant Terra for trivial issues and Sol for the rest. The other reason is spend. The loop runs on subscriptions with weekly windows, so stewards track how much of each window is left and move load between Codex and Claude. If a backend runs out mid-week, its lane fails over to the next one in the list. Changing a pin is a settings edit that the coordinator picks up on its next pass, with no restart. And changes get tested. In late October claims alternated between backends by issue number for 58 hours so the two lanes could be compared on turns, recovery and tokens per merged PR. On October 27 three pins moved to cheaper models behind a canary with a written revert rule. The November 8 audit measured Terra on trivial work and set compaction at 150K. The method is always the same. Rollback triggers are agreed with me before the change and the baseline is recorded. After 24 hours the steward compares tokens per merged PR, first-pass merge rate and salvages per PR against the day before. If a trigger trips, the change is reverted, and outages or other confounders are named in the read. The compaction trial cut tokens per merged PR from 37.5 million to 21.1 million with first-pass steady at 57%, so it stayed. As of November 10 the order is Codex first with Claude as failover. Sol does most implementation, conflict repair and salvage, Terra takes trivial issues, Luna handles review replies, and Claude Sonnet did most of the day’s reviews. When Codex’s weekly window reaches 100%, Claude moves to the front for new work.</aside>
-</section>
-<section id="spend" class="slide" aria-label="Slide 13: Where the tokens go" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
-<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Where the tokens go</h2>
-<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
-<div style="display:flex;flex-direction:column;gap:4px">
-<p style="font-size:112px;font-weight:700;line-height:1.1;color:#0F1626">16.75B</p>
-<p style="font-size:28px;line-height:1.35;color:#3E4756">Codex tokens in one week, across 1,353 sessions</p>
-</div>
-<div style="display:flex;flex-direction:column;gap:4px">
-<p style="font-size:112px;font-weight:700;line-height:1.1;color:#0F1626">98.7%</p>
-<p style="font-size:28px;line-height:1.35;color:#3E4756">of input tokens were cache reads</p>
-</div>
-<div style="display:flex;flex-direction:column;gap:4px">
-<p style="font-size:112px;font-weight:700;line-height:1.1;color:#0F1626">7%</p>
-<p style="font-size:28px;line-height:1.35;color:#3E4756">of sessions used 51% of all tokens</p>
-</div>
-</div>
-<div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:48px">
-<div style="display:flex;flex-direction:column;gap:12px">
-<h3 style="font-size:36px;font-weight:600;color:#8A5A0A">What drove it</h3>
-<ul style="font-size:28px;line-height:1.35;color:#3E4756">
-<li>Large sessions re-read 150–254K tokens of context every turn</li>
-<li>Compaction didn’t kick in until about 500K</li>
-<li>One salvage session burned 457M tokens over 1,957 turns</li>
-</ul>
-</div>
-<div style="display:flex;flex-direction:column;gap:12px">
-<h3 style="font-size:36px;font-weight:600;color:#8A5A0A">Changes on Nov 8, and the result</h3>
-<ul style="font-size:28px;line-height:1.35;color:#3E4756">
-<li>Compaction starts at 150K tokens, with effort set to low</li>
-<li>A per-session token ceiling (#12322) and budgets recalibrated from recent receipts (#12323)</li>
-<li>A day later: tokens per merged PR down 44%, from 37.5M to 21.1M. No rollback trigger tripped, so the change stayed</li>
-</ul>
-</div>
-</div>
-<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#3E4756">Source: docs/audits/2026-11-08-codex-spend-and-estimates.md · Codex rollouts Nov 1–8</p>
-<aside hidden>Numbers from the November 8 spend audit. Almost all of the input is cached, but the cached reads still dominate the bill because the context is huge: the biggest sessions were re-reading 150 to 250 thousand tokens on every turn for hundreds or thousands of turns, and compaction only started near the 500K limit. A handful of runaway sessions account for half the spend; the worst was one salvage at 457 million tokens. Terra did fine on trivial issues, completing 96% of them at a median of 6.6 million tokens each, but we haven’t tried it on standard work yet. On November 8 we lowered the compaction point to 150K, set effort explicitly, added a per-session token ceiling and recalibrated budgets from every recent receipt, since about a third of merged PRs go over their estimate. All of that merged the same day. The compaction change had rollback triggers agreed in advance: first-pass merges under 50% on the 24-hour rate, more than one salvage per merged PR, or any session failing at compaction. The 24-hour read came back with tokens per merged PR down from 37.5 million to 21.1 million, first-pass at 57.1% against 54.2% before, salvages unchanged at 0.8, and 143 compactions with none failing. Nothing tripped, so the settings stayed. Those first-pass figures are 24-hour rates, which run lower than the weekly figure later in the deck.</aside>
-</section>
-<section id="evals" class="slide" aria-label="Slide 14: Prompt evals" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:48px">
-<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA">Prompt evals</h2>
-<div style="display:flex;flex-direction:row;align-items:stretch;gap:24px">
-<div style="flex:none;width:420px;display:flex;flex-direction:column;gap:16px">
-<div style="background:#18223A;border:2px solid #2B3A55;border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:4px">
-<p style="font-size:28px;font-weight:600;color:#F4F1EA">Baseline</p>
-<p style="font-size:24px;color:#B9C4D6">prompts on main</p>
-</div>
-<div style="background:#18223A;border:2px solid #2B3A55;border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:4px">
-<p style="font-size:28px;font-weight:600;color:#F4F1EA">Candidate</p>
-<p style="font-size:24px;color:#B9C4D6">prompts from the PR</p>
-</div>
-<div style="background:#18223A;border:2px solid #2B3A55;border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:4px">
-<p style="font-size:28px;font-weight:600;color:#F4F1EA">Weakened control</p>
-<p style="font-size:24px;color:#B9C4D6">policy removed, should fail</p>
-</div>
-</div>
-<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:56px;height:28px;background:#D9A441"></div>
-<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:28px;display:flex;flex-direction:column;justify-content:center;gap:8px">
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">PROMPTFOO · OPENCODE</p>
-<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">Isolated trials</h3>
-<p style="font-size:28px;line-height:1.35;color:#B9C4D6">A clean home and workspace for each trial. The model only gets fake tools that log every call, with no shell or network.</p>
-</div>
-<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:56px;height:28px;background:#D9A441"></div>
-<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:28px;display:flex;flex-direction:column;justify-content:center;gap:8px">
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">GRADING</p>
-<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">Graded from the log</h3>
-<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Scores come from what the tools logged, not from what the model says it did.</p>
-</div>
-</div>
-<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
-<p style="font-size:28px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">Fixtures come from real incidents: false done, duplicate claims, stale reviews, truncated output and prompt injection.</p>
-<p style="font-size:28px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">Each study is planned up front: three windows, at least 20 samples per cell, and a $15 budget.</p>
-<p style="font-size:28px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">Results are advisory. Studies run on demand on the Mac, never in CI.</p>
-</div>
-<aside hidden>This is how we test a prompt change before trusting it. The harness in tools/prompt-eval runs the same situation three ways: with the prompts on main, with the prompts from the PR, and with a deliberately weakened prompt that should fail. If the weakened one passes, the fixture isn’t testing anything. Each trial gets a clean environment, and the model can only call fake tools that log what it did. Grading reads that log, so a model that claims it did the right thing but didn’t still fails. Fixtures come from things that actually went wrong in production, including prompt-injection attempts planted in issue text, comments and logs. Studies are planned in advance with fixed sample sizes and a budget, and the results are advisory for now.</aside>
-</section>
-<section id="feedback" class="slide" aria-label="Slide 15: Feedback loops" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:28px">
+<section id="feedback" class="slide" aria-label="Slide 23: Feedback loops" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:28px">
 <div style="display:flex;flex-direction:column;gap:16px">
 <h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Feedback loops</h2>
 <p style="font-size:28px;line-height:1.35;color:#3E4756">Screenshots, play tests and soak runs all come back the same way: as a finding on a PR or as a new issue for the loop.</p>
@@ -671,83 +1064,7 @@ body { font-family: 'IBM Plex Sans', Arial, sans-serif; }
 <p style="font-size:28px;line-height:1.35;color:#3E4756">CI screenshots are mostly day-one scenes, so mid-game problems only show up in live play. Feel and taste stay with kbuckler.</p>
 <aside hidden>This is how what the game actually looks and plays like gets back into the loop. There are four routes, and they all end the same way, as a finding on a PR or a new GitHub issue, so the loop picks the work up like anything else. First, inside a PR: the review agent judges the declared screenshots, blocking findings go back to the session that owns the PR, and advisories are filed as issues. Second, after merge: every three hours the Presentation steward reads main’s latest CI screenshots from R2, and the before-and-after pairs on each PR’s screenshot comment. It files the defects it finds, roughly 80 to 120 look and UX issues in the last week, and sends me a look sheet every morning. Third, live play: the same steward drives the one live Unity editor on the Mac. It has played the first hour six times so far, about once every day or two, after key merges and each test build, and other stewards can ask it to load a branch and show what happens. This route exists because CI screenshots are mostly day-one scenes, so mid-game problems never show up in them. In play test 4, three of the first four sales were refused and the Markets screen said nothing about what buyers could pay. That became #12417, which merged on November 10 and was checked in play test 6. Findings go to whoever owns the problem: UI to the polish programs, sim to the Simulation steward, and design forks to me as multiple-choice questions. Live evidence is labelled diagnosis only, because it’s Metal on a laptop and not the CI renderer, so it never validates a PR. Fourth, the sim: every three hours the Simulation and gameplay steward checks whether main changed the economy, the content or the runner, and if it did, runs one pass over everything merged since. A pass is a five-year soak on three seeds with the Gate A bars, the first-hour benchmark and the information benchmark. It takes about 22 minutes on the Mac, and hosted CI runs none of it. On November 7 one merge broke two of those bars, and this is what caught it. The steward also measures PR heads against a control run on main before they merge. A regression becomes a bug issue with a bisect, and a conflict between two bars becomes a design question for me. The bars themselves are never loosened. What none of this covers is feel. Whether it’s fun, whether the pacing works, whether the map reads: that’s mine, in weekly QA and at the milestone playtests.</aside>
 </section>
-<section id="identity" class="slide" aria-label="Slide 16: Identities" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
-<div style="display:flex;flex-direction:column;gap:16px">
-<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Identities</h2>
-<p style="font-size:28px;line-height:1.35;color:#3E4756">The login decides what an actor may do. A signature in a comment doesn’t grant anything.</p>
-</div>
-<div style="display:flex;flex-direction:column">
-<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px;border-top:2px solid #E2DCCF">
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;font-weight:600;color:#8A5A0A;width:560px">kbuckler</p>
-<p style="font-size:28px;line-height:1.35;color:#0F1626;width:1080px">Rulings, merge-delegated, protected ready, P0 and releasing hold</p>
-</div>
-<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px;border-top:2px solid #E2DCCF">
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#0F1626;width:560px">orrery-steward[bot]</p>
-<p style="font-size:28px;line-height:1.35;color:#3E4756;width:1080px">Steward comments, issue edits, labels and pushes</p>
-</div>
-<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px;border-top:2px solid #E2DCCF">
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#0F1626;width:560px">orrery-session[bot]</p>
-<p style="font-size:28px;line-height:1.35;color:#3E4756;width:1080px">Commits, pushes and PRs from Codex and Claude sessions</p>
-</div>
-<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px;border-top:2px solid #E2DCCF">
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#0F1626;width:560px">orrery-coordinator[bot]</p>
-<p style="font-size:28px;line-height:1.35;color:#3E4756;width:1080px">Coordinator merges, labels and comments, plus Claude’s reviews</p>
-</div>
-<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px;border-top:2px solid #E2DCCF">
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#0F1626;width:560px">review App</p>
-<p style="font-size:28px;line-height:1.35;color:#3E4756;width:1080px">Codex and OpenCode review verdicts, with minimal permissions</p>
-</div>
-<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px;border-top:2px solid #E2DCCF;border-bottom:2px solid #E2DCCF">
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#0F1626;width:560px">github-actions</p>
-<p style="font-size:28px;line-height:1.35;color:#3E4756;width:1080px">CI checks from pr.yml and unity.yml</p>
-</div>
-</div>
-<p style="font-size:28px;line-height:1.35;color:#0F1626;background:#E6DFD0;padding:24px 32px;border-radius:16px">Only my login carries maintainer authority. Under decision #12422 a steward can add protected ready in its own area, but only as a signed RULING: posted on my account.</p>
-<aside hidden>Every actor writes as its own identity, and that’s what decides what it’s allowed to do. Maintainer authority comes from my login and nothing else. An agent can’t get it by signing a comment as me, and the beacon audits for that. The bots mint short-lived tokens from private keys kept at mode 600 and never fall back to a personal token. The coordinator does all its reads and writes as its own App, so it doesn’t eat into my API rate limit. Status: that App is still called orrery-autonomous-agent on GitHub today. orrery-coordinator is the name it’s moving to. Codex and OpenCode reviews go through a separate App with fewer permissions, and the coordinator won’t launch one if that App turns out to be the same identity as its own.</aside>
-</section>
-<section id="fleet" class="slide" aria-label="Slide 17: Where it runs" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
-<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA">Where it runs</h2>
-<div style="display:grid;grid-template-columns:5fr 6fr;gap:32px">
-<div style="background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#D9A441">MACOS · LAUNCHD</p>
-<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">The Mac</h3>
-<ul style="font-size:28px;line-height:1.35;color:#B9C4D6">
-<li>orrery-loop, the only acting coordinator</li>
-<li>Deployed as versioned release bundles</li>
-<li>Agent worktrees, one per active PR</li>
-<li>App keys at mode 600, no token fallback</li>
-<li>The live Unity editor for hands-on QA</li>
-</ul>
-</div>
-<div style="background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#5FA8D3">BARE-METAL LINUX</p>
-<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">astrolabe</h3>
-<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Ryzen 9 3950X, 64 GB RAM, RTX 3090 rendering over Vulkan</p>
-<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px">
-<div style="flex:1;display:flex;flex-direction:column;gap:4px">
-<p style="font-size:64px;font-weight:700;line-height:1.1;color:#F4F1EA">8</p>
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">Unity</p>
-</div>
-<div style="flex:1;display:flex;flex-direction:column;gap:4px">
-<p style="font-size:64px;font-weight:700;line-height:1.1;color:#F4F1EA">6</p>
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">general</p>
-</div>
-<div style="flex:1;display:flex;flex-direction:column;gap:4px">
-<p style="font-size:64px;font-weight:700;line-height:1.1;color:#F4F1EA">3</p>
-<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">light</p>
-</div>
-</div>
-<p style="font-size:28px;line-height:1.35;color:#B9C4D6">17 runners as systemd user services. No GitHub login or API token on the box.</p>
-</div>
-</div>
-<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
-<p style="font-size:28px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">If a lane is paused, a GitHub-hosted job fails so nobody mistakes it for green.</p>
-<p style="font-size:28px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">Unity fills the box: 8 runners at 4 CPUs use all 32 threads, so going faster means shorter jobs.</p>
-<p style="font-size:28px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">Golden-master hashes only count when run on linux-x64.</p>
-</div>
-<aside hidden>Two machines do the work. The Mac runs the coordinator under launchd, the agent worktrees and the keys. It’s also where the live Unity editor runs when I want to look at something by hand, and where prompt evals run. Only one coordinator may act at a time. The lock is a file on that machine, so moving it means stopping the old one first. It runs from versioned release bundles and redeploys itself from main after landings, so a deploy or a rollback is a switch between bundles. astrolabe is a Linux box on the local network with a 3950X, 64 GB and a 3090, running seventeen GitHub runners: eight for Unity, six general and three light. The three inspect runners were retired on November 9. Unity jobs get four CPUs each, one Unity runner is reserved for the merge train, and a shared Unity Accelerator cache runs next to them. Eight runners at four CPUs is all 32 threads, so the box is full on Unity. Two trials showed that more CPUs per job don’t help, which leaves shorter jobs as the lever: about a third of a Unity test job is startup and teardown. Every host change gets a number, a revert condition, and reads at 6 and 24 hours. Adding the eighth Unity runner on November 8 cut the 90th-percentile wait for a Unity PR job from 27 minutes to 4, so it stayed. The hardware isn’t always the limit. At a quiet moment on November 10, 51 ready Unity issues were waiting on the coordinator’s cap of 6 Unity PRs in flight while one Unity job was running. There’s no GitHub login or API token on the box. Each runner only holds its own registration. Golden-master hashes are only authoritative on linux-x64, so that’s where they’re checked. When a lane is paused on purpose, a GitHub-hosted job fails so the pause is visible, and an hourly watchdog files a P0 if main goes red.</aside>
-</section>
-<section id="numbers" class="slide" aria-label="Slide 18: By the numbers" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:28px">
+<section id="numbers" class="slide" aria-label="Slide 24: By the numbers" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:28px">
 <div style="display:flex;flex-direction:column;gap:12px">
 <h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">By the numbers</h2>
 <p style="font-size:28px;line-height:1.35;color:#3E4756">Merges per day nearly tripled since August. More PRs now need a repair pass, and each one takes longer to land.</p>
@@ -875,7 +1192,7 @@ body { font-family: 'IBM Plex Sans', Arial, sans-serif; }
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#3E4756">Sources: GitHub search, 5,068 PRs merged Aug 5 – Nov 9; loop beacon #142 and trial read on #7867 · Shaded: coordinator off Oct 8–17</p>
 <aside hidden>Three trends, and four numbers for where the loop is right now. The charts come from GitHub search over every merged PR since the first one on August 5, in Monday-to-Sunday weeks. The shaded band is my vacation, October 8 to 17, when I couldn’t leave the coordinator running, so nothing merged. Throughput went from about 28 merged PRs a day in August to 79 last week, with a peak of 94. First pass means a PR merged without ever needing a salvage session. Salvage only started in late August, so the line starts there at 83%. It dropped to 40% in late September as volume jumped and has sat around 64% since, short of the 70% target. Open to merge runs from when the draft PR opens, which is at claim time, to when it lands, so it includes the work itself. The median has crept up from 20 minutes to about 3 hours and the slowest tenth take 13 hours or more. The gap in the p90 line is the week of October 12, where PRs stuck over the vacation took 199 hours. The bottom row is what a merged PR costs right now. Tokens per merged PR is the Loop and watch steward’s 24-hour read after the November 8 compaction change: 21 million, down from 37.5 million the day before. The other three are from the loop’s own beacon, the status issue the coordinator rewrites every pass, for the 7 days to November 10: 3.2 agent sessions per merged PR, 45% of sessions doing repair work like salvage and conflict fixes, and 1.5 review rounds per merged PR with a median of one. The beacon’s own 7-day first-pass figure is 59.5%, a little under last week’s 64%.</aside>
 </section>
-<section id="lessons" class="slide" aria-label="Slide 19: What we learned" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
+<section id="lessons" class="slide" aria-label="Slide 25: What we learned" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
 <h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">What we learned</h2>
 <div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
 <div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
@@ -905,7 +1222,7 @@ body { font-family: 'IBM Plex Sans', Arial, sans-serif; }
 </div>
 <aside hidden>Six things we learned the hard way. On August 18 two unrelated PRs, each green on its own branch, broke main for about two and a half hours. That’s why the merge train exists. The coordinator’s refusal rules mostly came out of incidents too: re-read before writing, cap the irreversible writes, and never treat unknown as red. On cost, nearly all the input was cached and it still dominated the bill, so the job card work cut the starting prompt more than tenfold and compaction now starts at 150K. The nine handoff formats drifted until one schema replaced them, and the last legacy fallback is being retired under #8273. Sessions are disposable, so no steward keeps state in its head. And on August 19 GitHub showed a Unity runner online and busy for nine hours with nothing behind it, so paused lanes now fail loudly. One more that didn’t fit on the slide: estimates miss. About a third of merged PRs go over budget, which is why budgets are now calibrated from every recent receipt.</aside>
 </section>
-<section id="next" class="slide" aria-label="Slide 20: What’s next" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:56px">
+<section id="next" class="slide" aria-label="Slide 26: What’s next" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:56px">
 <h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA">What’s next</h2>
 <div style="display:flex;flex-direction:column;gap:16px">
 <p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#D9A441">THE GAME</p>
@@ -965,7 +1282,7 @@ body { font-family: 'IBM Plex Sans', Arial, sans-serif; }
 <div id="notes" hidden aria-live="polite"><p></p></div>
 <div id="bar" role="toolbar" aria-label="Slide controls">
 <button id="prev" type="button" aria-label="Previous slide">&#8249;</button>
-<span id="counter">1 / 20</span>
+<span id="counter">1 / 26</span>
 <button id="next" type="button" aria-label="Next slide">&#8250;</button>
 <button id="notes-toggle" type="button" aria-pressed="false" title="Speaker notes (N)">Notes</button>
 <button id="full" type="button" title="Full screen (F)">Full screen</button>
