@@ -1,0 +1,1075 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Orrery’s agent loop</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&amp;display=swap">
+<style>
+html, body { margin: 0; height: 100%; background: #05070C; overflow: hidden; }
+body { font-family: 'IBM Plex Sans', Arial, sans-serif; }
+#viewport { position: fixed; left: 0; top: 0; right: 0; bottom: 0; }
+#stage { position: absolute; left: 50%; top: 50%; width: 1920px; height: 1080px; transform-origin: center center; visibility: hidden; }
+#stage * { box-sizing: border-box; }
+.slide { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; overflow: hidden; opacity: 0; visibility: hidden; transition: opacity 0.25s ease, visibility 0s linear 0.25s; }
+.slide.active { opacity: 1; visibility: visible; transition: opacity 0.25s ease; }
+.slide > :not([style*="position:absolute"]) { position: relative; }
+.slide h1, .slide h2, .slide h3, .slide p, .slide ul, .slide ol { margin: 0; }
+.slide h1 { font-size: 96px; font-weight: 600; line-height: 1.1; }
+.slide h2 { font-size: 64px; font-weight: 600; line-height: 1.15; }
+.slide h3 { font-size: 44px; font-weight: 600; line-height: 1.2; }
+.slide p { font-size: 32px; font-weight: 400; line-height: 1.4; }
+.slide ul, .slide ol { padding-left: 1.2em; line-height: 1.4; }
+.slide div { display: flex; flex-direction: column; }
+.slide img { display: block; }
+.slide .arrow-right { clip-path: polygon(0 30%, 60% 30%, 60% 0, 100% 50%, 60% 100%, 60% 70%, 0 70%); }
+.slide .connectors { pointer-events: none; }
+
+#bar { position: fixed; right: 16px; bottom: 16px; display: flex; align-items: center; gap: 4px; padding: 6px; border-radius: 10px; background: rgba(15, 22, 38, 0.88); border: 1px solid #2B3A55; color: #F4F1EA; font-size: 14px; opacity: 0; transition: opacity 0.2s ease; z-index: 3; }
+#bar.awake, #bar:focus-within { opacity: 1; }
+#bar button { font: inherit; color: inherit; background: transparent; border: 0; border-radius: 6px; min-width: 36px; height: 36px; padding: 0 10px; cursor: pointer; }
+#bar button:hover { background: #2B3A55; }
+#bar button:focus-visible { outline: 2px solid #D9A441; outline-offset: 1px; }
+#bar button[aria-pressed="true"] { background: #2B3A55; color: #D9A441; }
+#counter { min-width: 64px; text-align: center; font-variant-numeric: tabular-nums; color: #B9C4D6; }
+#notes { box-sizing: border-box; position: fixed; left: 0; right: 0; bottom: 0; height: 30vh; overflow-y: auto; padding: 20px 28px 64px; background: #0F1626; border-top: 1px solid #2B3A55; color: #D8DFEA; font-size: 18px; line-height: 1.55; z-index: 2; }
+#notes[hidden] { display: none; }
+#notes p { margin: 0 auto; max-width: 76ch; }
+@media (hover: none) { #bar { opacity: 0.9; } }
+@media (prefers-reduced-motion: reduce) { .slide, .slide.active, #bar { transition: none; } }
+@media print {
+  @page { size: 1920px 1080px; margin: 0; }
+  html, body { height: auto; overflow: visible; background: #fff; }
+  #viewport { position: static; }
+  #stage { position: static; visibility: visible !important; transform: none !important; height: auto; }
+  .slide, .slide.active { position: relative; opacity: 1; visibility: visible; transition: none; break-after: page; }
+  #bar, #notes { display: none !important; }
+}
+</style>
+<noscript><style>#stage { visibility: visible; transform: translate(-50%, -50%) scale(0.5); }</style></noscript>
+</head>
+<body>
+<div id="viewport">
+<main id="stage">
+<section id="cover" class="slide active" aria-label="Slide 1: Orrery’s agent loop" style="background:#05070C;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;justify-content:center;gap:40px">
+<img src="img/cover.jpg" alt="A grey metal freighter passing a banded green gas giant whose rings are tilted open, with two small moons beyond" style="position:absolute;left:0px;top:0px;width:1920px;height:1080px;object-fit:cover">
+<div style="width:760px;display:flex;flex-direction:column;gap:32px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:4px;text-transform:uppercase;color:#D9A441">Orrery · Engineering</p>
+<h1 style="font-size:112px;font-weight:600;line-height:1.05;color:#F4F1EA">Orrery’s<br>agent loop</h1>
+<p style="font-size:36px;line-height:1.35;color:#B9C4D6;width:700px">How work gets from a GitHub issue to main, and what runs it</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#B9C4D6">November 2026</p>
+</div>
+<aside hidden>A quick tour of how Orrery gets built. First the game, then the architecture in three layers: the stewards who manage the loop, the loop itself, and the fleet of agents it runs. Then how results feed back, the machines it runs on, the numbers so far, what we learned and what’s next. The backdrop is a staged hero shot from the live editor: Freighter #38 passing Sol’s ringed gas giant on day 165 of a seed-1 run. It’s the game’s own models and scene, but set up for this deck: the camera was placed by hand, the giant was turned so its rings open toward us, the freighter’s paint and shine were toned down with a rim light added, and the ring drawing was fixed for the shot. The game’s ship panel doesn’t look like this yet.</aside>
+</section>
+<section id="intro" class="slide" aria-label="Slide 2: Project Orrery" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;flex-direction:row;align-items:center;gap:64px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA;white-space:nowrap">Project Orrery</h2>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6;width:1120px"><i>A clockwork galaxy you wind up, watch run, and slowly come to own.</i> A single-player 4X about running a company in a simulated economy.</p>
+</div>
+<div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:64px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<img src="img/galaxy.jpg" alt="The galaxy map on day one: a blue spiral galaxy with about thirty named star systems joined by lanes, each marked by who controls it: Independent in blue, the Veridian Combine in gold and the Mercantile Syndicate in green" style="width:800px;height:450px;object-fit:cover;border-radius:12px;border:2px solid #2B3A55">
+<p style="font-size:24px;color:#B9C4D6">The galaxy on day one, colored by who controls each system</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<img src="img/planet.jpg" alt="An Earth-like planet with oceans, green coastlines, swirling cloud and a cyclone, half in shadow, with a cratered yellow-brown moon behind it" style="width:800px;height:450px;object-fit:cover;border-radius:12px;border:2px solid #2B3A55">
+<p style="font-size:24px;color:#B9C4D6">Alpha Centauri’s Earth-like world and its moon</p>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(5, 1fr);gap:32px">
+<div style="display:flex;flex-direction:column;gap:4px;border-top:2px solid #2B3A55;padding:16px 0px 0px 0px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">sim/</p>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">The simulation. Plain C#, no Unity references.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px;border-top:2px solid #2B3A55;padding:16px 0px 0px 0px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">data/</p>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">Game content as JSON. Ids are never reused.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px;border-top:2px solid #2B3A55;padding:16px 0px 0px 0px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">game/</p>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">The Unity 6 client: rendering and input.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px;border-top:2px solid #2B3A55;padding:16px 0px 0px 0px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">tests/ + Runner</p>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">Headless soaks and golden-master checks.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px;border-top:2px solid #2B3A55;padding:16px 0px 0px 0px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">service/</p>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">The coordinator that runs the dev loop.</p>
+</div>
+</div>
+<aside hidden>Orrery is a single-player space 4X where the economy is the game. You start with one freighter and a line of credit in a galaxy of NPC factions, and every ship and station is run by a named person with skills and loyalties. The touchstones are X4, Distant Worlds, Aurora, Victoria and Football Manager. The main technical rule is that the simulation is a plain C# library with no Unity in it. It runs on fixed ticks with seeded randomness, so a run is reproducible and we can check it against golden-master hashes. Unity just draws it and takes input. Content lives in JSON under data/. The galaxy map is a current frame from CI on main, rendered on the runner box’s 3090. The planet is staged: it’s Alpha Centauri’s world at day 166, rendered from the in-game 3D view with the camera framed by hand for this deck.</aside>
+</section>
+<section id="interface" class="slide" aria-label="Slide 3: The interface is the game" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;flex-direction:row;align-items:center;gap:64px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA;white-space:nowrap">The interface is the game</h2>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">If the sim computes it, the player can see it,<br>sort it and chart it over time.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:center;gap:32px">
+<img src="img/interface.png" alt="The game on day 331 in three panels: the galaxy map with a hull plate price tag on each system, the Markets observatory charting traded volume by ware over 330 days, and the Forge Foundry Beta station panel with its faction, manager, workforce and credits" style="width:1292px;height:728px;object-fit:cover;border-radius:12px;border:2px solid #2B3A55">
+<div style="flex:1;display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;flex-direction:column;gap:4px;border-top:2px solid #2B3A55;padding:16px 0px 0px 0px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">MAP</p>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">Hull plate prices by system, with the age of each reading</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px;border-top:2px solid #2B3A55;padding:16px 0px 0px 0px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">CHART</p>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">Traded volume for the four biggest wares over 330 days</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px;border-top:2px solid #2B3A55;padding:16px 0px 0px 0px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">STATION</p>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">Forge Foundry Beta, which turns ore into hull plate</p>
+</div>
+</div>
+</div>
+<aside hidden>This is the second design pillar: the interface is the game. Everything the simulation tracks, the player can look at, sort and chart. The frame shows one ware three ways on day 331. On top is the galaxy map with the hull plate price overlay, where each tag is a price and how many days old that reading is. Below it, the Markets observatory charts traded volume for the four biggest wares over 330 days. On the right is the panel for Forge Foundry Beta, a Veridian Combine station that turns iron and silicon ore into hull plate, so it sits behind two of the lines on the chart. This is the live game on current main, seed 1, run to day 331 in the editor on the Mac. Three things were staged for the shot. The Aim button in the top bar and the Omniscient view checkbox in Markets were hidden, and the spacing on the station panel’s four tabs was tightened so they fit on one row. The permanent fix for the tabs is #12663. Everything else is the real interface, set up through its own controls: the overlay picker, the Markets dock at part height and the station panel.</aside>
+</section>
+<section id="overview" class="slide" aria-label="Slide 4: Architecture" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px">
+<div style="position:absolute;left:128px;top:320px;width:1664px;height:160px;background:#EFE5CC;border:2px solid #E2D5B0;border-radius:20px"></div>
+<div style="position:absolute;left:128px;top:540px;width:1664px;height:160px;background:#DFE7EE;border:2px solid #C8D5E0;border-radius:20px"></div>
+<div style="position:absolute;left:128px;top:760px;width:1664px;height:160px;background:#EFE5CC;border:2px solid #E2D5B0;border-radius:20px"></div>
+<h2 style="position:absolute;left:128px;top:128px;width:1664px;font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Architecture</h2>
+<p style="position:absolute;left:128px;top:218px;width:1664px;font-size:28px;line-height:1.35;color:#3E4756">Stewards use model judgment to manage a deterministic loop.<br>That loop schedules and coordinates a fleet of implementation agents.</p>
+<p style="position:absolute;left:156px;top:366px;width:230px;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;font-weight:600;color:#8A5A0A">INFERENCE</p>
+<p style="position:absolute;left:156px;top:400px;width:230px;font-size:24px;color:#3E4756">Judgment</p>
+<p style="position:absolute;left:156px;top:586px;width:230px;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;font-weight:600;color:#1F5F8B">DETERMINISTIC</p>
+<p style="position:absolute;left:156px;top:620px;width:230px;font-size:24px;color:#3E4756">The loop</p>
+<p style="position:absolute;left:156px;top:806px;width:230px;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;font-weight:600;color:#8A5A0A">INFERENCE</p>
+<p style="position:absolute;left:156px;top:840px;width:230px;font-size:24px;color:#3E4756">Execution</p>
+<div style="position:absolute;left:400px;top:345px;width:845px;height:110px;background:#FBF9F4;border:2px solid #8A5A0A;border-radius:16px;padding:12px 24px;display:flex;flex-direction:column;justify-content:center">
+<p style="font-size:28px;font-weight:600;color:#0F1626">Stewards</p>
+<p style="font-size:24px;color:#3E4756">Five LLM sessions that stage work, tune the loop and clear blockers</p>
+</div>
+<div style="position:absolute;left:1430px;top:345px;width:330px;height:110px;background:#FBF9F4;border:2px solid #E2D5B0;border-radius:16px;padding:12px 24px;display:flex;flex-direction:column;justify-content:center">
+<p style="font-size:28px;font-weight:600;color:#0F1626">kbuckler</p>
+<p style="font-size:24px;color:#3E4756">Rulings and approvals</p>
+</div>
+<div style="position:absolute;left:400px;top:565px;width:330px;height:110px;background:#FBF9F4;border:2px solid #1F5F8B;border-radius:16px;padding:12px 24px;display:flex;flex-direction:column;justify-content:center">
+<p style="font-size:28px;font-weight:600;color:#0F1626">Coordinator</p>
+<p style="font-size:24px;color:#3E4756">A pass every 5–10 min</p>
+</div>
+<div style="position:absolute;left:915px;top:565px;width:330px;height:110px;background:#0F1626;border-radius:16px;padding:12px 24px;display:flex;flex-direction:column;justify-content:center">
+<p style="font-size:28px;font-weight:600;color:#F4F1EA">GitHub</p>
+<p style="font-size:24px;color:#B9C4D6">The only shared state</p>
+</div>
+<div style="position:absolute;left:1430px;top:565px;width:330px;height:110px;background:#FBF9F4;border:2px solid #C8D5E0;border-radius:16px;padding:12px 24px;display:flex;flex-direction:column;justify-content:center">
+<p style="font-size:28px;font-weight:600;color:#0F1626">CI runners</p>
+<p style="font-size:24px;color:#3E4756">17 runners on astrolabe</p>
+</div>
+<div style="position:absolute;left:400px;top:785px;width:845px;height:110px;background:#FBF9F4;border:2px solid #8A5A0A;border-radius:16px;padding:12px 24px;display:flex;flex-direction:column;justify-content:center">
+<p style="font-size:28px;font-weight:600;color:#0F1626">Implementation agents</p>
+<p style="font-size:24px;color:#3E4756">A fleet of Codex and Claude sessions that implement, repair and review</p>
+</div>
+<svg class="connectors" aria-hidden="true" width="1920" height="1080" viewBox="0 0 1920 1080" style="position:absolute;left:0px;top:0px"><polyline points="1245,400 1430,400" fill="none" stroke="#8A5A0A" stroke-width="3"/><polygon points="1430,400 1418,392.8 1418,407.2" fill="#8A5A0A"/><polygon points="1245,400 1257,407.2 1257,392.8" fill="#8A5A0A"/><polyline points="565,455 565,565" fill="none" stroke="#8A5A0A" stroke-width="3"/><polygon points="565,565 572.2,553 557.8,553" fill="#8A5A0A"/><polyline points="1080,455 1080,565" fill="none" stroke="#8A5A0A" stroke-width="3"/><polygon points="1080,565 1087.2,553 1072.8,553" fill="#8A5A0A"/><polyline points="730,620 915,620" fill="none" stroke="#1F5F8B" stroke-width="3"/><polygon points="915,620 903,612.8 903,627.2" fill="#1F5F8B"/><polygon points="730,620 742,627.2 742,612.8" fill="#1F5F8B"/><polyline points="1245,620 1430,620" fill="none" stroke="#1F5F8B" stroke-width="3"/><polygon points="1430,620 1418,612.8 1418,627.2" fill="#1F5F8B"/><polygon points="1245,620 1257,627.2 1257,612.8" fill="#1F5F8B"/><polyline points="565,675 565,785" fill="none" stroke="#1F5F8B" stroke-width="3"/><polygon points="565,785 572.2,773 557.8,773" fill="#1F5F8B"/><polyline points="1080,785 1080,675" fill="none" stroke="#8A5A0A" stroke-width="3"/><polygon points="1080,675 1072.8,687 1087.2,687" fill="#8A5A0A"/><polyline points="1595,675 1595,840 1245,840" fill="none" stroke="#1F5F8B" stroke-width="3"/><polygon points="1245,840 1257,847.2 1257,832.8" fill="#1F5F8B"/></svg>
+<p style="position:absolute;left:1257px;top:358px;width:165px;font-size:24px;white-space:nowrap;color:#3E4756">decisions</p>
+<p style="position:absolute;left:577px;top:493px;width:260px;font-size:24px;white-space:nowrap;color:#3E4756">settings, holds, recovery</p>
+<p style="position:absolute;left:1092px;top:493px;width:260px;font-size:24px;white-space:nowrap;color:#3E4756">groom, ready</p>
+<p style="position:absolute;left:742px;top:578px;width:165px;font-size:24px;white-space:nowrap;color:#3E4756">reads, merges</p>
+<p style="position:absolute;left:1257px;top:578px;width:165px;font-size:24px;white-space:nowrap;color:#3E4756">jobs, checks</p>
+<p style="position:absolute;left:577px;top:713px;width:260px;font-size:24px;white-space:nowrap;color:#3E4756">job cards</p>
+<p style="position:absolute;left:1092px;top:713px;width:300px;font-size:24px;white-space:nowrap;color:#3E4756">PRs, reviews, records</p>
+<p style="position:absolute;left:1270px;top:798px;width:310px;font-size:24px;white-space:nowrap;color:#3E4756">screenshots for review</p>
+<aside hidden>This is the whole system in three layers. On top is judgment: me, and five steward sessions. Stewards are LLM sessions, so they can read a situation and decide. They stage the work by grooming and readying issues, they tune the loop’s settings, put a hold on a PR that would break main, step in when something is stuck, and ask me for decisions in batches. In the middle is the loop, and there is no model in it. The coordinator is plain code on a timer, with a pass starting every five to ten minutes. It reads everything on GitHub, which is the only shared state, launches agents for ready work, and merges what passes. CI runs on seventeen self-hosted runners on a Linux box called astrolabe. At the bottom is the fleet: Codex and Claude sessions that the coordinator launches with a job card. They write the code, repair failing PRs and review each other’s work, and everything they produce goes back to GitHub as PRs, reviews and session records. The arrow on the right is the feedback path: screenshots from CI go to the review agent, which the feedback slides cover later.</aside>
+</section>
+<section id="stewards" class="slide" aria-label="Slide 5: Stewards" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:32px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Stewards</h2>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">A steward is a long-running LLM session that owns one program. Stewards manage the loop with judgment the loop doesn’t have: they stage its work, tune it and step in when it stalls. The loop writes the code.</p>
+</div>
+<div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:64px">
+<div style="display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;flex-direction:column;gap:4px">
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">They feed the loop</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">File, groom and ready issues, keeping about 15 runnable at a time</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">They tune and repair it</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Change settings and model pins, hold or recover stuck PRs, and file an issue for every stall they find</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">They check what it ships</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Soaks, benchmarks and screenshot checks after merges, with questions for kbuckler sent in batches</p>
+</div>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:28px 32px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#8A5A0A">OPEN STEWARDS</p>
+<div style="display:flex;flex-direction:row;gap:24px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#8A5A0A;width:130px">#7867</p>
+<div style="display:flex;flex-direction:column">
+<p style="font-size:28px;color:#0F1626">Loop &amp; watch</p>
+<p style="font-size:24px;color:#3E4756">The coordinator, merge train and loop spend</p>
+</div>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#8A5A0A;width:130px">#9543</p>
+<div style="display:flex;flex-direction:column">
+<p style="font-size:28px;color:#0F1626">Backlog &amp; roadmap</p>
+<p style="font-size:24px;color:#3E4756">Ready queue, grooming and milestone plans</p>
+</div>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#8A5A0A;width:130px">#8850</p>
+<div style="display:flex;flex-direction:column">
+<p style="font-size:28px;color:#0F1626">Presentation</p>
+<p style="font-size:24px;color:#3E4756">Celestial look, UI/UX and the live editor</p>
+</div>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#8A5A0A;width:130px">#10247</p>
+<div style="display:flex;flex-direction:column">
+<p style="font-size:28px;color:#0F1626">Simulation &amp; gameplay</p>
+<p style="font-size:24px;color:#3E4756">Sim and gameplay through M5B and the MVP</p>
+</div>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#8A5A0A;width:130px">#8464</p>
+<div style="display:flex;flex-direction:column">
+<p style="font-size:28px;color:#0F1626">Runner hosts</p>
+<p style="font-size:24px;color:#3E4756">Size and health of the astrolabe runners</p>
+</div>
+</div>
+</div>
+</div>
+<h3 style="font-size:36px;font-weight:600;color:#8A5A0A">Their state lives on GitHub, so restarting one only takes its parent issue number.</h3>
+<aside hidden>Stewards are the top layer, and they are the part that thinks. Each one is an interactive LLM session I start with a parent issue, and it owns a program of work for days. The loop underneath is deterministic and can’t make a judgment call, so the stewards make them for it. They feed it: they do the research, ask me what they need answered, then file, groom and ready the issues. Backlog &amp; roadmap keeps about 15 issues runnable at a time, at least 6 of them without Unity. It releases the highest priority first and the oldest first within a priority, and it won’t ready filler to hit the number. They tune and repair it: Loop &amp; watch reads throughput every hour, changes settings and model pins under a lease, puts a hold on a PR that would break main, sweeps blocked PRs when the 25-PR ceiling binds, and files one issue for each kind of stall it finds. And they check what comes out: Simulation &amp; gameplay runs five-year soaks and the first-hour benchmarks every three hours when the sim has changed, which on November 7 caught a merge that broke two bars hosted CI doesn’t run, Runner hosts measures the fleet before and after every host change, and Presentation checks main’s CI screenshots every three hours and plays the first hour in the live editor every day or two. A steward only writes code itself when I tell it to, and none of this counts as the loop running on its own. Routine writes go out as orrery-steward[bot]. Anything that needs my authority goes out on my account with a RULING: comment. A steward keeps nothing in its own memory: its charter is on the parent issue, its progress is on a GitHub project board, and heartbeats, pauses and leases on shared resources are on one shared board. If a session dies, a new one picks up from the parent issue.</aside>
+</section>
+<section id="lifecycle" class="slide" aria-label="Slide 6: Issue lifecycle" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Issue lifecycle</h2>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">One issue, one issue-N branch, one PR. You can tell where anything is from its labels and branch.</p>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A">01 · triage → groomed</p>
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Groom</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Scoped, sized and given a priority</p>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A">02 · ready</p>
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Approve</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">The label is the approval. The coordinator rechecks the issue before dispatch</p>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A">03 · in-progress</p>
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Claim</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Pushing issue-N is the lock, so a second claim fails</p>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A">04 · draft PR</p>
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Build</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Code, tests, local gate and self-review in draft</p>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A">05 · Code review</p>
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Review</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Exact-head CI and a separate review agent</p>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A">06 · in-train</p>
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Land</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Merged in a batch, and Fixes #N closes the issue</p>
+</div>
+</div>
+<div style="display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:16px">
+<p style="font-size:28px;color:#3E4756">Other states:</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#0F1626;background:#E6DFD0;padding:8px 18px;border-radius:24px">blocked</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#0F1626;background:#E6DFD0;padding:8px 18px;border-radius:24px">needs-groom</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#0F1626;background:#E6DFD0;padding:8px 18px;border-radius:24px">design-question</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#0F1626;background:#E6DFD0;padding:8px 18px;border-radius:24px">hold</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#0F1626;background:#E6DFD0;padding:8px 18px;border-radius:24px">needs-kbuckler</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#0F1626;background:#E6DFD0;padding:8px 18px;border-radius:24px">protected</p>
+</div>
+<aside hidden>This is the path almost every change takes. Grooming scopes the issue and sets its priority. Putting ready on it is the approval. There’s no separate sign-off step. Stewards run an issue through a readiness checklist before they label it, and the coordinator checks again by rule when it promotes or dispatches: the required sections are there, the budget parses, the files it names exist on main and nothing it depends on is still open. An issue that fails goes back as needs-groom. A session claims it by pushing a branch called issue-N, and since only one push can create that branch, two sessions can’t grab the same issue. Work happens in a draft PR with a local gate and a self-review, then it flips to ready for review, which starts full CI and an independent review agent. If it passes, it joins the merge train. Blocked means waiting on another issue, needs-groom means the coordinator sent it back for another grooming pass, design-question means it needs a call from me, hold is a manual park, needs-kbuckler means the agent hit something outside its reach, and protected means I have to approve the merge.</aside>
+</section>
+<section id="coordinator" class="slide" aria-label="Slide 7: The coordinator" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">The coordinator</h2>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">orrery-loop is a .NET service that starts a pass every 5 to 10 minutes. There’s no model inside it. It schedules and coordinates the agent fleet by rule, and can only do what its code allows.</p>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:12px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#1F5F8B">TIER 1</p>
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Does itself</h3>
+<ul style="font-size:28px;line-height:1.35;color:#3E4756">
+<li>Lands tested batches through the merge train</li>
+<li>Closes issues a merged PR fixes</li>
+<li>Unblocks issues once their dependencies close</li>
+<li>Cleans up stale claims and drafts</li>
+</ul>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:12px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A">TIER 2</p>
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Dispatches</h3>
+<ul style="font-size:28px;line-height:1.35;color:#3E4756">
+<li>An implementer per ready issue</li>
+<li>Salvage and conflict repair on PRs</li>
+<li>Code review rounds</li>
+<li>CI workflow runs</li>
+</ul>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:12px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#9B3B2A">TIER 3</p>
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Escalates</h3>
+<ul style="font-size:28px;line-height:1.35;color:#3E4756">
+<li>Protected or path-fenced PRs</li>
+<li>Any design ambiguity</li>
+<li>New third-party dependencies</li>
+<li>Anything that changes cost, like recovery timers</li>
+</ul>
+</div>
+</div>
+<aside hidden>The coordinator is plain code on a timer, and it redeploys itself from main when its own fixes land. Each pass it reads every open PR and works out who owes the next move. Mechanical things it just does: landing merge-train batches, closing fixed issues, reviving unblocked issues, cleaning up. Anything that needs judgment, it hands to an agent session or a CI run. Putting ready on an issue gets it dispatched within minutes. That’s how it coordinates the fleet: today’s caps are 5 protected, 15 unprotected and 6 Unity PRs in flight, with a ceiling of 25 open loop PRs that also counts ones parked off-loop, and the P0 to P3 priority rungs decide the order. It’s built to run unattended. It re-reads a PR before every write, caps its irreversible writes per pass, and if it can’t read a state it waits instead of guessing. The third column is stuff it isn’t allowed to decide at all. It has no way to page me. It escalates by adding a label or a comment, so if nobody looks at the board, nothing happens. It never reviews code and never writes code.</aside>
+</section>
+<section id="train" class="slide" aria-label="Slide 8: Merge train" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA">Merge train</h2>
+<div style="display:flex;flex-direction:row;align-items:stretch;gap:24px">
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">1 · ADMIT</p>
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">Approved PRs</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Green on their own branch and approved in review</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:56px;height:28px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">2 · BATCH</p>
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">Combine</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Merged together onto current main</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:56px;height:28px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">3 · TEST</p>
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">Run checks</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Required checks on the combined tree</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:56px;height:28px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:28px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">4 · LAND</p>
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">Merge</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">main moves to exactly what was tested</p>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:32px">
+<div style="background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">If a batch fails</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Each PR is retried alone on the same main. The red ones go to salvage and the rest re-batch.</p>
+</div>
+<div style="background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">Protected PRs</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">They wait for me to add merge-delegated, then go through the train like anything else.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#B9C4D6">Why it exists: on Aug 18, two green, unrelated PRs (#1072 and #1073) broke main together for about 2.5 hours (#1082).</p>
+<aside hidden>Before the train, a PR merged if it was green on its own branch. That stopped being good enough on August 18, when two PRs that were each green and had nothing to do with each other broke main as soon as both landed. Now the coordinator batches approved PRs, composes them onto current main on a loop-train ref, runs the required checks on that exact tree once, Unity included, and only then moves main. PRs aren’t refreshed against main one at a time. We looked at GitHub’s merge queue and decided to keep our own. When a batch fails, each member gets a solo run on the same main to find the culprit. Protected and path-fenced PRs can’t get on the train at all until I add merge-delegated.</aside>
+</section>
+<section id="visual" class="slide" aria-label="Slide 9: Visual review" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA">Visual review</h2>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Screenshots are judged as part of code review. The agent looks at the pixels before it reads the PR’s own claims.</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:stretch;gap:16px">
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:6px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">1 · DECLARE</p>
+<h3 style="font-size:28px;font-weight:600;line-height:1.2;color:#F4F1EA">The PR names its captures</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">A Unity-scope line lists up to twelve</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:6px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">2 · RENDER</p>
+<h3 style="font-size:28px;font-weight:600;line-height:1.2;color:#F4F1EA">CI takes the screenshots</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">Playmode tests on astrolabe’s 3090</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:6px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">3 · PUBLISH</p>
+<h3 style="font-size:28px;font-weight:600;line-height:1.2;color:#F4F1EA">Captures go to R2</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">One sticky PR comment links them all</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:6px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">4 · JUDGE</p>
+<h3 style="font-size:28px;font-weight:600;line-height:1.2;color:#F4F1EA">The review agent looks</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">Full-size PNGs, their criteria and main’s baseline</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #D9A441;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:6px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">5 · VERDICT</p>
+<h3 style="font-size:28px;font-weight:600;line-height:1.2;color:#F4F1EA">Block or advise</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">Part of the same review verdict as the code</p>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
+<div style="display:flex;flex-direction:column;gap:8px;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">What blocks</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Broken rendering, an implausible world, a UI floor violation or a written FAIL line, if the PR introduced it.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">What doesn’t</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Defects already on main, and anything about taste or genre. Those become advisory issues.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">Guard rails</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">A measurable blocker has to quote a pixel probe. Only models that can see may judge.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#B9C4D6">Criteria live in game/VisualCriteria: about 290 files, one per capture family, plus a shared rubric · decision #11035</p>
+<aside hidden>This is how the loop reviews how the game looks. A PR that touches the game declares its Unity scope in the body: which tests to run and which screenshots it wants judged, twelve at most. CI runs those playmode tests on astrolabe’s 3090 and uploads the captures to R2, and one sticky comment on the PR links them. Before the review agent starts, the coordinator checks that the screenshot report belongs to this exact head, then hands the agent every declared PNG at full size along with its criteria file, any reference images and main’s version of the same shot. The agent looks at the pixels first and the PR’s description second, and its findings go into the same review verdict as the code. What blocks is narrow: broken rendering, a world that isn’t plausible, a violation of the UI design floor, or a FAIL condition written in that capture’s criteria file, and only when this PR introduced it. Main is used to decide who caused a defect, never whether it’s acceptable. Anything measurable has to come with a pixel probe result, or it’s advisory. Taste, genre and inherited defects never block. They become advisory issues, and inherited ones are collected in one ledger issue per capture family. A blocking-grade defect that’s already on main doesn’t hold the PR, but it gets filed at P1. Only models on the vision allowlist may judge captures. If none is available, the review waits instead of approving blind. This replaced a separate visual inspector job under decision #11035.</aside>
+</section>
+<section id="jobcard" class="slide" aria-label="Slide 10: Job cards" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Job cards</h2>
+<div style="display:grid;grid-template-columns:760px 1fr;gap:48px">
+<div style="background:#0F1626;border-radius:16px;padding:32px;display:flex;flex-direction:column">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;color:#B9C4D6"><span style="color:#F4F1EA"># Job card — launch data</span><br>Payload: <span style="color:#D9A441">{{payload}}</span><br>Labels: <span style="color:#D9A441">{{labels}}</span><br>Rung: <span style="color:#D9A441">{{rung}}</span><br>Budget: <span style="color:#D9A441">{{budget}}</span><br>Turns used: <span style="color:#D9A441">{{turns_used}}</span><br>Branch: <span style="color:#D9A441">{{branch}}</span><br>Verified head: <span style="color:#D9A441">{{verified_head}}</span><br>Wake reason: <span style="color:#D9A441">{{wake_reason}}</span><br>MODEL: <span style="color:#D9A441">{{model}}</span><br>SESSION: <span style="color:#D9A441">{{session}}</span><br>Finish invocation: <span style="color:#D9A441">{{session_finish}}</span><br>… 7 more slots<br><span style="color:#F4F1EA">## Standing grants for the launching role</span><br><span style="color:#D9A441">{{grants}}</span><br><span style="color:#F4F1EA">## Issue body and thread — untrusted data</span><br><span style="color:#D9A441">{{issue_context}}</span></p>
+</div>
+<div style="display:flex;flex-direction:column;gap:32px">
+<div style="display:flex;flex-direction:column;gap:4px">
+<p style="font-size:64px;font-weight:700;line-height:1.1;color:#0F1626">103K → 8K</p>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">tokens in the implementer’s starting prompt, before this work (decision #279) and now</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Facts only</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">What this launch is, written down once</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Skills on demand</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">A Unity, investigation or P0 label loads its own skill</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Grants</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Read from .github/grants.json for this role</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Same renderer</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">The eval harness renders the same card</p>
+</div>
+</div>
+</div>
+<aside hidden>Every agent session starts with one of these. The panel is a shortened version of the template in .github/prompt-render-plans.json, which has 20 slots in total. The coordinator fills them in at launch: the payload, labels, priority, budget and turns used, branch and verified head, why it was woken, the exact model and session, and the exact session-finish command to run at the end. Codex resumes get a shorter delta card with only what changed. Then the grants that apply to that role, then the issue body and thread, capped at 12 KB and marked as untrusted. The card only holds facts. The rules live in the role docs and in skills, which load when a label calls for them. The big win was size. Before this work an implementer read about 103K tokens of policy before it even looked at its issue, and paid for that prefix on every call. Today the assembled prompt is about 7.9K tokens on Claude and 8.2K on Codex. The older figure includes the project instructions and the issue thread, so it isn’t a perfect like-for-like, but it’s close.</aside>
+</section>
+<section id="record" class="slide" aria-label="Slide 11: Session records" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA">Session records</h2>
+<div style="display:grid;grid-template-columns:7fr 8fr;gap:48px">
+<div style="background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:32px;display:flex;flex-direction:column">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;line-height:1.4;letter-spacing:0.5px;color:#F4F1EA"><span style="color:#D9A441">&lt;!-- orrery-session-record v1 --&gt;</span><br>{<br>&#160;&#160;<span style="color:#5FA8D3">"schema"</span>: "orrery.session-record/1",<br>&#160;&#160;<span style="color:#5FA8D3">"attempt"</span>: "cx_done",<br>&#160;&#160;<span style="color:#5FA8D3">"session"</span>: "cx_done",<br>&#160;&#160;<span style="color:#5FA8D3">"role"</span>: "implementer",<br>&#160;&#160;<span style="color:#5FA8D3">"target"</span>: "pr:41",<br>&#160;&#160;<span style="color:#5FA8D3">"outcome"</span>: "done",<br>&#160;&#160;<span style="color:#5FA8D3">"head"</span>: "0123456789abcdef…",<br>&#160;&#160;<span style="color:#5FA8D3">"next"</span>: { <span style="color:#5FA8D3">"actor"</span>: "reviewer",<br>&#160;&#160;&#160;&#160;<span style="color:#5FA8D3">"step"</span>: "review the ready head" },<br>&#160;&#160;<span style="color:#5FA8D3">"validation"</span>: { <span style="color:#5FA8D3">"local_gate"</span>: "passed" },<br>&#160;&#160;<span style="color:#5FA8D3">"usage"</span>: { <span style="color:#5FA8D3">"input"</span>: 1200, <span style="color:#5FA8D3">"cached"</span>: 800,<br>&#160;&#160;&#160;&#160;<span style="color:#5FA8D3">"output"</span>: 300 }<br>}</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:24px">
+<div style="display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">orrery.session-record/1</p>
+<h3 style="font-size:36px;font-weight:600;line-height:1.2;color:#F4F1EA">Replaced nine handoff formats</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">One comment holding one JSON object. The posting helper and the coordinator both validate it (decision #248).</p>
+</div>
+<div style="display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:12px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#B9C4D6;padding:8px 8px 8px 0px">outcome</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F4F1EA;background:#18223A;border:2px solid #2B3A55;padding:8px 18px;border-radius:24px">done</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F4F1EA;background:#18223A;border:2px solid #2B3A55;padding:8px 18px;border-radius:24px">blocked</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F4F1EA;background:#18223A;border:2px solid #2B3A55;padding:8px 18px;border-radius:24px">stood-down</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F4F1EA;background:#18223A;border:2px solid #2B3A55;padding:8px 18px;border-radius:24px">failed</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F4F1EA;background:#18223A;border:2px solid #2B3A55;padding:8px 18px;border-radius:24px">needs-maintainer</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#F4F1EA;background:#18223A;border:2px solid #2B3A55;padding:8px 18px;border-radius:24px">closed</p>
+</div>
+<ul style="font-size:28px;line-height:1.35;color:#B9C4D6">
+<li>Only accepted if attempt, session, role and target match a real launch</li>
+<li>blocked needs a blocker, needs-maintainer needs a question, and done on a PR needs its head</li>
+<li>Unknown fields are rejected, and the Python and C# sides share test fixtures</li>
+</ul>
+</div>
+</div>
+<aside hidden>This is how a session tells the coordinator it’s done. We had nine different text formats for handoffs, all parsed separately, and they drifted. Now every session ends by running tools/session-finish, which posts one comment with a marker line and a JSON block like this one, shortened from a test fixture. Status: the slide shows where this ends up under #8273. Today the coordinator still falls back to the old text stop lines until #8901 lands, and the launch receipt that replaces the start marker is #8803. The coordinator only trusts a record if it matches a launch it actually made, so a stray comment can’t pass itself off as a handoff. The fields replace the old text conventions: next says who moves next, awaiting_run is for waiting on a CI run, blockers and question are for parking, and usage feeds the spend numbers. The Python helper and the C# parser are tested against the same set of good and bad examples.</aside>
+</section>
+<section id="models" class="slide" aria-label="Slide 12: Model selection" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Model selection</h2>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">No role is tied to one model. Pins move with what the work needs and what the subscriptions have left, and stewards test each change before it sticks.</p>
+</div>
+<div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:48px">
+<div style="display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;flex-direction:column;gap:4px">
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Capability</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">A complexity label picks the tier. On Nov 10, Codex ran Sol for most work, Terra for trivial issues and Luna for review replies, and Claude Sonnet did most reviews.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Spend</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Stewards watch the Codex and Claude usage windows. Codex goes first today, and when its weekly window hits 100% Claude takes the new work.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<h3 style="font-size:36px;font-weight:600;color:#0F1626">Testing a change</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Rollback triggers are agreed first. Then a 24-hour read against the day before on tokens per merged PR, first-pass rate and salvages.</p>
+</div>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#8A5A0A">TRIALS STEWARDS HAVE RUN</p>
+<div style="display:flex;flex-direction:row;gap:24px;border-top:2px solid #E2DCCF;padding:14px 0px 0px 0px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A;width:150px;flex:none">Oct 23–26</p>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">Claims alternated between Codex and Claude by issue number, compared on turns and tokens per merged PR</p>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px;border-top:2px solid #E2DCCF;padding:14px 0px 0px 0px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A;width:150px;flex:none">Oct 27</p>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">Three pins moved to cheaper models behind a canary: revert if fewer than 70% of attempts complete</p>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px;border-top:2px solid #E2DCCF;padding:14px 0px 0px 0px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A;width:150px;flex:none">Nov 1–8</p>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">Terra on trivial work: 96% of issues completed, at a median 6.6M tokens each</p>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px;border-top:2px solid #E2DCCF;padding:14px 0px 0px 0px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#8A5A0A;width:150px;flex:none">Nov 8–9</p>
+<p style="font-size:24px;line-height:1.35;color:#3E4756">Compaction at 150K tokens cut tokens per merged PR by 44% in a day. No rollback trigger tripped, so it stayed</p>
+</div>
+</div>
+</div>
+<aside hidden>Nothing about model choice is fixed. Every role has a pin, and the pins change for two reasons. One is capability: grooming puts a complexity label on each issue, and that picks the tier, so trivial work goes to a cheaper model and hard work, review and judgment calls stay on the strongest ones. Early in November on Codex that meant Terra for trivial issues and Sol for the rest. The other reason is spend. The loop runs on subscriptions with weekly windows, so stewards track how much of each window is left and move load between Codex and Claude. If a backend runs out mid-week, its lane fails over to the next one in the list. Changing a pin is a settings edit that the coordinator picks up on its next pass, with no restart. And changes get tested. In late October claims alternated between backends by issue number for 58 hours so the two lanes could be compared on turns, recovery and tokens per merged PR. On October 27 three pins moved to cheaper models behind a canary with a written revert rule. The November 8 audit measured Terra on trivial work and set compaction at 150K. The method is always the same. Rollback triggers are agreed with me before the change and the baseline is recorded. After 24 hours the steward compares tokens per merged PR, first-pass merge rate and salvages per PR against the day before. If a trigger trips, the change is reverted, and outages or other confounders are named in the read. The compaction trial cut tokens per merged PR from 37.5 million to 21.1 million with first-pass steady at 57%, so it stayed. As of November 10 the order is Codex first with Claude as failover. Sol does most implementation, conflict repair and salvage, Terra takes trivial issues, Luna handles review replies, and Claude Sonnet did most of the day’s reviews. When Codex’s weekly window reaches 100%, Claude moves to the front for new work.</aside>
+</section>
+<section id="spend" class="slide" aria-label="Slide 13: Where the tokens go" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:40px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Where the tokens go</h2>
+<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
+<div style="display:flex;flex-direction:column;gap:4px">
+<p style="font-size:112px;font-weight:700;line-height:1.1;color:#0F1626">16.75B</p>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Codex tokens in one week, across 1,353 sessions</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<p style="font-size:112px;font-weight:700;line-height:1.1;color:#0F1626">98.7%</p>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">of input tokens were cache reads</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px">
+<p style="font-size:112px;font-weight:700;line-height:1.1;color:#0F1626">7%</p>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">of sessions used 51% of all tokens</p>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:48px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600;color:#8A5A0A">What drove it</h3>
+<ul style="font-size:28px;line-height:1.35;color:#3E4756">
+<li>Large sessions re-read 150–254K tokens of context every turn</li>
+<li>Compaction didn’t kick in until about 500K</li>
+<li>One salvage session burned 457M tokens over 1,957 turns</li>
+</ul>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<h3 style="font-size:36px;font-weight:600;color:#8A5A0A">Changes on Nov 8, and the result</h3>
+<ul style="font-size:28px;line-height:1.35;color:#3E4756">
+<li>Compaction starts at 150K tokens, with effort set to low</li>
+<li>A per-session token ceiling (#12322) and budgets recalibrated from recent receipts (#12323)</li>
+<li>A day later: tokens per merged PR down 44%, from 37.5M to 21.1M. No rollback trigger tripped, so the change stayed</li>
+</ul>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#3E4756">Source: docs/audits/2026-11-08-codex-spend-and-estimates.md · Codex rollouts Nov 1–8</p>
+<aside hidden>Numbers from the November 8 spend audit. Almost all of the input is cached, but the cached reads still dominate the bill because the context is huge: the biggest sessions were re-reading 150 to 250 thousand tokens on every turn for hundreds or thousands of turns, and compaction only started near the 500K limit. A handful of runaway sessions account for half the spend; the worst was one salvage at 457 million tokens. Terra did fine on trivial issues, completing 96% of them at a median of 6.6 million tokens each, but we haven’t tried it on standard work yet. On November 8 we lowered the compaction point to 150K, set effort explicitly, added a per-session token ceiling and recalibrated budgets from every recent receipt, since about a third of merged PRs go over their estimate. All of that merged the same day. The compaction change had rollback triggers agreed in advance: first-pass merges under 50% on the 24-hour rate, more than one salvage per merged PR, or any session failing at compaction. The 24-hour read came back with tokens per merged PR down from 37.5 million to 21.1 million, first-pass at 57.1% against 54.2% before, salvages unchanged at 0.8, and 143 compactions with none failing. Nothing tripped, so the settings stayed. Those first-pass figures are 24-hour rates, which run lower than the weekly figure later in the deck.</aside>
+</section>
+<section id="evals" class="slide" aria-label="Slide 14: Prompt evals" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:48px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA">Prompt evals</h2>
+<div style="display:flex;flex-direction:row;align-items:stretch;gap:24px">
+<div style="flex:none;width:420px;display:flex;flex-direction:column;gap:16px">
+<div style="background:#18223A;border:2px solid #2B3A55;border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:4px">
+<p style="font-size:28px;font-weight:600;color:#F4F1EA">Baseline</p>
+<p style="font-size:24px;color:#B9C4D6">prompts on main</p>
+</div>
+<div style="background:#18223A;border:2px solid #2B3A55;border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:4px">
+<p style="font-size:28px;font-weight:600;color:#F4F1EA">Candidate</p>
+<p style="font-size:24px;color:#B9C4D6">prompts from the PR</p>
+</div>
+<div style="background:#18223A;border:2px solid #2B3A55;border-radius:12px;padding:20px 24px;display:flex;flex-direction:column;gap:4px">
+<p style="font-size:28px;font-weight:600;color:#F4F1EA">Weakened control</p>
+<p style="font-size:24px;color:#B9C4D6">policy removed, should fail</p>
+</div>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:56px;height:28px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:28px;display:flex;flex-direction:column;justify-content:center;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">PROMPTFOO · OPENCODE</p>
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">Isolated trials</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">A clean home and workspace for each trial. The model only gets fake tools that log every call, with no shell or network.</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:56px;height:28px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:28px;display:flex;flex-direction:column;justify-content:center;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">GRADING</p>
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">Graded from the log</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Scores come from what the tools logged, not from what the model says it did.</p>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">Fixtures come from real incidents: false done, duplicate claims, stale reviews, truncated output and prompt injection.</p>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">Each study is planned up front: three windows, at least 20 samples per cell, and a $15 budget.</p>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">Results are advisory. Studies run on demand on the Mac, never in CI.</p>
+</div>
+<aside hidden>This is how we test a prompt change before trusting it. The harness in tools/prompt-eval runs the same situation three ways: with the prompts on main, with the prompts from the PR, and with a deliberately weakened prompt that should fail. If the weakened one passes, the fixture isn’t testing anything. Each trial gets a clean environment, and the model can only call fake tools that log what it did. Grading reads that log, so a model that claims it did the right thing but didn’t still fails. Fixtures come from things that actually went wrong in production, including prompt-injection attempts planted in issue text, comments and logs. Studies are planned in advance with fixed sample sizes and a budget, and the results are advisory for now.</aside>
+</section>
+<section id="feedback" class="slide" aria-label="Slide 15: Feedback loops" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Feedback loops</h2>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Screenshots, play tests and soak runs all come back the same way: as a finding on a PR or as a new issue for the loop.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;flex-direction:row;gap:16px">
+<p style="width:420px;flex:none;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#8A5A0A">SIGNAL</p>
+<div style="width:48px;flex:none"></div>
+<p style="width:420px;flex:none;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#8A5A0A">WHO LOOKS</p>
+<div style="width:48px;flex:none"></div>
+<p style="flex:1;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#8A5A0A">WHAT COMES BACK</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:stretch;gap:16px">
+<div style="width:420px;flex:none;background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:14px 24px;display:flex;flex-direction:column;justify-content:center">
+<p style="font-size:28px;font-weight:600;color:#0F1626">PR screenshots</p>
+<p style="font-size:24px;color:#3E4756">The PR’s declared captures</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#8A5A0A"></div>
+<div style="width:420px;flex:none;background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:14px 24px;display:flex;flex-direction:column;justify-content:center">
+<p style="font-size:28px;font-weight:600;color:#0F1626">Code Review Agent</p>
+<p style="font-size:24px;color:#3E4756">Inside its review verdict</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#8A5A0A"></div>
+<div style="flex:1;background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:14px 24px;display:flex;flex-direction:column;justify-content:center">
+<p style="font-size:24px;line-height:1.35;color:#0F1626">Blocking findings go to the PR’s own session to fix. Advisories become issues.</p>
+</div>
+</div>
+<div style="display:flex;flex-direction:row;align-items:stretch;gap:16px">
+<div style="width:420px;flex:none;background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:14px 24px;display:flex;flex-direction:column;justify-content:center">
+<p style="font-size:28px;font-weight:600;color:#0F1626">Screenshots on main</p>
+<p style="font-size:24px;color:#3E4756">After look-affecting merges</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#8A5A0A"></div>
+<div style="width:420px;flex:none;background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:14px 24px;display:flex;flex-direction:column;justify-content:center">
+<p style="font-size:28px;font-weight:600;color:#0F1626">Presentation steward</p>
+<p style="font-size:24px;color:#3E4756">Every 3 hours, plus a daily sheet</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#8A5A0A"></div>
+<div style="flex:1;background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:14px 24px;display:flex;flex-direction:column;justify-content:center">
+<p style="font-size:24px;line-height:1.35;color:#0F1626">Defect issues for the loop: about 80 to 120 look and UX defects in the last week.</p>
+</div>
+</div>
+<div style="display:flex;flex-direction:row;align-items:stretch;gap:16px">
+<div style="width:420px;flex:none;background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:14px 24px;display:flex;flex-direction:column;justify-content:center">
+<p style="font-size:28px;font-weight:600;color:#0F1626">Live play tests</p>
+<p style="font-size:24px;color:#3E4756">The Unity editor on the Mac</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#8A5A0A"></div>
+<div style="width:420px;flex:none;background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:14px 24px;display:flex;flex-direction:column;justify-content:center">
+<p style="font-size:28px;font-weight:600;color:#0F1626">Presentation steward</p>
+<p style="font-size:24px;color:#3E4756">Every day or two, and on request</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#8A5A0A"></div>
+<div style="flex:1;background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:14px 24px;display:flex;flex-direction:column;justify-content:center">
+<p style="font-size:24px;line-height:1.35;color:#0F1626">Issues for whichever program owns the problem. Live evidence is diagnosis only and never gates a merge.</p>
+</div>
+</div>
+<div style="display:flex;flex-direction:row;align-items:stretch;gap:16px">
+<div style="width:420px;flex:none;background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:14px 24px;display:flex;flex-direction:column;justify-content:center">
+<p style="font-size:28px;font-weight:600;color:#0F1626">Soaks and benchmarks</p>
+<p style="font-size:24px;color:#3E4756">Five-year runs and the first hour</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#8A5A0A"></div>
+<div style="width:420px;flex:none;background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:14px 24px;display:flex;flex-direction:column;justify-content:center">
+<p style="font-size:28px;font-weight:600;color:#0F1626">Simulation steward</p>
+<p style="font-size:24px;color:#3E4756">Every 3 hours, if the sim changed</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#8A5A0A"></div>
+<div style="flex:1;background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:14px 24px;display:flex;flex-direction:column;justify-content:center">
+<p style="font-size:24px;line-height:1.35;color:#0F1626">Bug issues with a bisect, or a design question for kbuckler. One Nov 7 merge broke two bars CI doesn’t run.</p>
+</div>
+</div>
+</div>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">CI screenshots are mostly day-one scenes, so mid-game problems only show up in live play. Feel and taste stay with kbuckler.</p>
+<aside hidden>This is how what the game actually looks and plays like gets back into the loop. There are four routes, and they all end the same way, as a finding on a PR or a new GitHub issue, so the loop picks the work up like anything else. First, inside a PR: the review agent judges the declared screenshots, blocking findings go back to the session that owns the PR, and advisories are filed as issues. Second, after merge: every three hours the Presentation steward reads main’s latest CI screenshots from R2, and the before-and-after pairs on each PR’s screenshot comment. It files the defects it finds, roughly 80 to 120 look and UX issues in the last week, and sends me a look sheet every morning. Third, live play: the same steward drives the one live Unity editor on the Mac. It has played the first hour six times so far, about once every day or two, after key merges and each test build, and other stewards can ask it to load a branch and show what happens. This route exists because CI screenshots are mostly day-one scenes, so mid-game problems never show up in them. In play test 4, three of the first four sales were refused and the Markets screen said nothing about what buyers could pay. That became #12417, which merged on November 10 and was checked in play test 6. Findings go to whoever owns the problem: UI to the polish programs, sim to the Simulation steward, and design forks to me as multiple-choice questions. Live evidence is labelled diagnosis only, because it’s Metal on a laptop and not the CI renderer, so it never validates a PR. Fourth, the sim: every three hours the Simulation and gameplay steward checks whether main changed the economy, the content or the runner, and if it did, runs one pass over everything merged since. A pass is a five-year soak on three seeds with the Gate A bars, the first-hour benchmark and the information benchmark. It takes about 22 minutes on the Mac, and hosted CI runs none of it. On November 7 one merge broke two of those bars, and this is what caught it. The steward also measures PR heads against a control run on main before they merge. A regression becomes a bug issue with a bisect, and a conflict between two bars becomes a design question for me. The bars themselves are never loosened. What none of this covers is feel. Whether it’s fun, whether the pacing works, whether the map reads: that’s mine, in weekly QA and at the milestone playtests.</aside>
+</section>
+<section id="identity" class="slide" aria-label="Slide 16: Identities" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">Identities</h2>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">The login decides what an actor may do. A signature in a comment doesn’t grant anything.</p>
+</div>
+<div style="display:flex;flex-direction:column">
+<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px;border-top:2px solid #E2DCCF">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;font-weight:600;color:#8A5A0A;width:560px">kbuckler</p>
+<p style="font-size:28px;line-height:1.35;color:#0F1626;width:1080px">Rulings, merge-delegated, protected ready, P0 and releasing hold</p>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px;border-top:2px solid #E2DCCF">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#0F1626;width:560px">orrery-steward[bot]</p>
+<p style="font-size:28px;line-height:1.35;color:#3E4756;width:1080px">Steward comments, issue edits, labels and pushes</p>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px;border-top:2px solid #E2DCCF">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#0F1626;width:560px">orrery-session[bot]</p>
+<p style="font-size:28px;line-height:1.35;color:#3E4756;width:1080px">Commits, pushes and PRs from Codex and Claude sessions</p>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px;border-top:2px solid #E2DCCF">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#0F1626;width:560px">orrery-coordinator[bot]</p>
+<p style="font-size:28px;line-height:1.35;color:#3E4756;width:1080px">Coordinator merges, labels and comments, plus Claude’s reviews</p>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px;border-top:2px solid #E2DCCF">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#0F1626;width:560px">review App</p>
+<p style="font-size:28px;line-height:1.35;color:#3E4756;width:1080px">Codex and OpenCode review verdicts, with minimal permissions</p>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px;border-top:2px solid #E2DCCF;border-bottom:2px solid #E2DCCF">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:28px;color:#0F1626;width:560px">github-actions</p>
+<p style="font-size:28px;line-height:1.35;color:#3E4756;width:1080px">CI checks from pr.yml and unity.yml</p>
+</div>
+</div>
+<p style="font-size:28px;line-height:1.35;color:#0F1626;background:#E6DFD0;padding:24px 32px;border-radius:16px">Only my login carries maintainer authority. Under decision #12422 a steward can add protected ready in its own area, but only as a signed RULING: posted on my account.</p>
+<aside hidden>Every actor writes as its own identity, and that’s what decides what it’s allowed to do. Maintainer authority comes from my login and nothing else. An agent can’t get it by signing a comment as me, and the beacon audits for that. The bots mint short-lived tokens from private keys kept at mode 600 and never fall back to a personal token. The coordinator does all its reads and writes as its own App, so it doesn’t eat into my API rate limit. Status: that App is still called orrery-autonomous-agent on GitHub today. orrery-coordinator is the name it’s moving to. Codex and OpenCode reviews go through a separate App with fewer permissions, and the coordinator won’t launch one if that App turns out to be the same identity as its own.</aside>
+</section>
+<section id="fleet" class="slide" aria-label="Slide 17: Where it runs" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA">Where it runs</h2>
+<div style="display:grid;grid-template-columns:5fr 6fr;gap:32px">
+<div style="background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#D9A441">MACOS · LAUNCHD</p>
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">The Mac</h3>
+<ul style="font-size:28px;line-height:1.35;color:#B9C4D6">
+<li>orrery-loop, the only acting coordinator</li>
+<li>Deployed as versioned release bundles</li>
+<li>Agent worktrees, one per active PR</li>
+<li>App keys at mode 600, no token fallback</li>
+<li>The live Unity editor for hands-on QA</li>
+</ul>
+</div>
+<div style="background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#5FA8D3">BARE-METAL LINUX</p>
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">astrolabe</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Ryzen 9 3950X, 64 GB RAM, RTX 3090 rendering over Vulkan</p>
+<div style="display:flex;flex-direction:row;gap:24px;padding:16px 0px">
+<div style="flex:1;display:flex;flex-direction:column;gap:4px">
+<p style="font-size:64px;font-weight:700;line-height:1.1;color:#F4F1EA">8</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">Unity</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:4px">
+<p style="font-size:64px;font-weight:700;line-height:1.1;color:#F4F1EA">6</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">general</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:4px">
+<p style="font-size:64px;font-weight:700;line-height:1.1;color:#F4F1EA">3</p>
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#5FA8D3">light</p>
+</div>
+</div>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">17 runners as systemd user services. No GitHub login or API token on the box.</p>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">If a lane is paused, a GitHub-hosted job fails so nobody mistakes it for green.</p>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">Unity fills the box: 8 runners at 4 CPUs use all 32 threads, so going faster means shorter jobs.</p>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6;border-top:2px solid #2B3A55;padding:20px 0px 0px 0px">Golden-master hashes only count when run on linux-x64.</p>
+</div>
+<aside hidden>Two machines do the work. The Mac runs the coordinator under launchd, the agent worktrees and the keys. It’s also where the live Unity editor runs when I want to look at something by hand, and where prompt evals run. Only one coordinator may act at a time. The lock is a file on that machine, so moving it means stopping the old one first. It runs from versioned release bundles and redeploys itself from main after landings, so a deploy or a rollback is a switch between bundles. astrolabe is a Linux box on the local network with a 3950X, 64 GB and a 3090, running seventeen GitHub runners: eight for Unity, six general and three light. The three inspect runners were retired on November 9. Unity jobs get four CPUs each, one Unity runner is reserved for the merge train, and a shared Unity Accelerator cache runs next to them. Eight runners at four CPUs is all 32 threads, so the box is full on Unity. Two trials showed that more CPUs per job don’t help, which leaves shorter jobs as the lever: about a third of a Unity test job is startup and teardown. Every host change gets a number, a revert condition, and reads at 6 and 24 hours. Adding the eighth Unity runner on November 8 cut the 90th-percentile wait for a Unity PR job from 27 minutes to 4, so it stayed. The hardware isn’t always the limit. At a quiet moment on November 10, 51 ready Unity issues were waiting on the coordinator’s cap of 6 Unity PRs in flight while one Unity job was running. There’s no GitHub login or API token on the box. Each runner only holds its own registration. Golden-master hashes are only authoritative on linux-x64, so that’s where they’re checked. When a lane is paused on purpose, a GitHub-hosted job fails so the pause is visible, and an hourly watchdog files a P0 if main goes red.</aside>
+</section>
+<section id="numbers" class="slide" aria-label="Slide 18: By the numbers" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;flex-direction:column;gap:12px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">By the numbers</h2>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Merges per day nearly tripled since August. More PRs now need a repair pass, and each one takes longer to land.</p>
+</div>
+<div style="display:flex;flex-direction:row;gap:64px">
+<div style="width:512px;display:flex;flex-direction:column;gap:8px">
+<p style="font-size:64px;font-weight:700;line-height:1.1;color:#0F1626">79 / day</p>
+<p style="font-size:24px;color:#3E4756">PRs merged per day, week of Nov 2–8</p>
+<div style="position:relative;width:512px;height:376px">
+<svg aria-label="Bar chart of PRs merged per day, weekly average: about 28 in early August, 91 the week of September 28, near zero while the coordinator was off October 8 to 17, a peak of 94 the week of October 19 and 79 the week of November 2" viewBox="0 0 448 310" width="448" height="310" style="position:absolute;left:64px;top:20px;width:448px;height:310px" xmlns="http://www.w3.org/2000/svg">
+<rect x="301.7" y="0" width="45.7" height="310" fill="#E6DFD0"/>
+<line x1="0" y1="1" x2="448" y2="1" stroke="#E2DCCF" stroke-width="2"/>
+<line x1="0" y1="155" x2="448" y2="155" stroke="#E2DCCF" stroke-width="2"/>
+<g fill="#1A6BB0">
+<path d="M3.0 310V241.2Q3.0 237.2 7.0 237.2H25.0Q29.0 237.2 29.0 241.2V310Z"/>
+<path d="M35.0 310V223.2Q35.0 219.2 39.0 219.2H57.0Q61.0 219.2 61.0 223.2V310Z"/>
+<path d="M67.0 310V221.0Q67.0 217.0 71.0 217.0H89.0Q93.0 217.0 93.0 221.0V310Z"/>
+<path d="M99.0 310V186.7Q99.0 182.7 103.0 182.7H121.0Q125.0 182.7 125.0 186.7V310Z"/>
+<path d="M131.0 310V168.6Q131.0 164.6 135.0 164.6H153.0Q157.0 164.6 157.0 168.6V310Z"/>
+<path d="M163.0 310V174.5Q163.0 170.5 167.0 170.5H185.0Q189.0 170.5 189.0 174.5V310Z"/>
+<path d="M195.0 310V227.3Q195.0 223.3 199.0 223.3H217.0Q221.0 223.3 221.0 227.3V310Z"/>
+<path d="M227.0 310V127.6Q227.0 123.6 231.0 123.6H249.0Q253.0 123.6 253.0 127.6V310Z"/>
+<path d="M259.0 310V79.7Q259.0 75.7 263.0 75.7H281.0Q285.0 75.7 285.0 79.7V310Z"/>
+<path d="M291.0 310V247.2Q291.0 243.2 295.0 243.2H313.0Q317.0 243.2 317.0 247.2V310Z"/>
+<path d="M323.0 310V297.0Q323.0 293.0 327.0 293.0H345.0Q349.0 293.0 349.0 297.0V310Z"/>
+<path d="M355.0 310V71.9Q355.0 67.9 359.0 67.9H377.0Q381.0 67.9 381.0 71.9V310Z"/>
+<path d="M387.0 310V147.9Q387.0 143.9 391.0 143.9H409.0Q413.0 143.9 413.0 147.9V310Z"/>
+<path d="M419.0 310V109.5Q419.0 105.5 423.0 105.5H441.0Q445.0 105.5 445.0 109.5V310Z"/>
+</g>
+<line x1="0" y1="309" x2="448" y2="309" stroke="#B8AE9C" stroke-width="2"/>
+</svg>
+<p style="position:absolute;left:0px;top:3px;width:52px;font-size:24px;text-align:right;color:#3E4756">120</p>
+<p style="position:absolute;left:0px;top:158px;width:52px;font-size:24px;text-align:right;color:#3E4756">60</p>
+<p style="position:absolute;left:0px;top:313px;width:52px;font-size:24px;text-align:right;color:#3E4756">0</p>
+<p style="position:absolute;left:52px;top:227px;width:56px;font-size:24px;line-height:1.1;font-weight:600;text-align:center;color:#0F1626">28</p>
+<p style="position:absolute;left:404px;top:58px;width:56px;font-size:24px;line-height:1.1;font-weight:600;text-align:center;color:#0F1626">94</p>
+<p style="position:absolute;left:468px;top:96px;width:56px;font-size:24px;line-height:1.1;font-weight:600;text-align:center;color:#0F1626">79</p>
+<p style="position:absolute;left:329px;top:135px;width:120px;height:30px;line-height:30px;font-size:24px;text-align:center;white-space:nowrap;transform:rotate(-90deg);color:#3E4756">vacation</p>
+<p style="position:absolute;left:52px;top:338px;width:56px;font-size:24px;text-align:center;color:#3E4756">Aug</p>
+<p style="position:absolute;left:180px;top:338px;width:56px;font-size:24px;text-align:center;color:#3E4756">Sep</p>
+<p style="position:absolute;left:308px;top:338px;width:56px;font-size:24px;text-align:center;color:#3E4756">Oct</p>
+<p style="position:absolute;left:436px;top:338px;width:56px;font-size:24px;text-align:center;color:#3E4756">Nov</p>
+</div>
+</div>
+<div style="width:512px;display:flex;flex-direction:column;gap:8px">
+<p style="font-size:64px;font-weight:700;line-height:1.1;color:#0F1626">64%</p>
+<p style="font-size:24px;color:#3E4756">merged with no repair pass that week</p>
+<div style="position:relative;width:512px;height:376px">
+<svg aria-label="Line chart of the weekly first-pass merge rate from late August: 83%, falling to 40% the week of September 21, then near 64% from mid-October, below the dashed 70% target" viewBox="0 0 448 310" width="448" height="310" style="position:absolute;left:64px;top:20px;width:448px;height:310px" xmlns="http://www.w3.org/2000/svg">
+<rect x="301.7" y="0" width="45.7" height="310" fill="#E6DFD0"/>
+<line x1="0" y1="1" x2="448" y2="1" stroke="#E2DCCF" stroke-width="2"/>
+<line x1="0" y1="155" x2="448" y2="155" stroke="#E2DCCF" stroke-width="2"/>
+<line x1="0" y1="309" x2="448" y2="309" stroke="#B8AE9C" stroke-width="2"/>
+<line x1="0" y1="93" x2="448" y2="93" stroke="#3E4756" stroke-width="2" stroke-dasharray="8 6"/>
+<polyline points="112.0,52.1 144.0,86.5 176.0,157.5 208.0,117.5 240.0,187.2 272.0,142.0 304.0,113.2 336.0,53.9 368.0,111.9 400.0,106.0 432.0,113.2" fill="none" stroke="#1A6BB0" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="112" cy="52.1" r="5" fill="#1A6BB0" stroke="#F4F1EA" stroke-width="2"/>
+<circle cx="240" cy="187.2" r="5" fill="#1A6BB0" stroke="#F4F1EA" stroke-width="2"/>
+<circle cx="432" cy="113.2" r="6" fill="#1A6BB0" stroke="#F4F1EA" stroke-width="2"/>
+</svg>
+<p style="position:absolute;left:0px;top:3px;width:52px;font-size:24px;text-align:right;color:#3E4756">100%</p>
+<p style="position:absolute;left:0px;top:158px;width:52px;font-size:24px;text-align:right;color:#3E4756">50%</p>
+<p style="position:absolute;left:0px;top:313px;width:52px;font-size:24px;text-align:right;color:#3E4756">0%</p>
+<p style="position:absolute;left:68px;top:118px;width:140px;font-size:24px;line-height:1.1;white-space:nowrap;color:#3E4756">70% target</p>
+<p style="position:absolute;left:108px;top:59px;width:56px;font-size:24px;line-height:1.1;font-weight:600;text-align:right;color:#0F1626">83%</p>
+<p style="position:absolute;left:276px;top:218px;width:56px;font-size:24px;line-height:1.1;font-weight:600;text-align:center;color:#0F1626">40%</p>
+<p style="position:absolute;left:456px;top:145px;width:56px;font-size:24px;line-height:1.1;font-weight:600;text-align:right;color:#0F1626">64%</p>
+<p style="position:absolute;left:52px;top:338px;width:56px;font-size:24px;text-align:center;color:#3E4756">Aug</p>
+<p style="position:absolute;left:180px;top:338px;width:56px;font-size:24px;text-align:center;color:#3E4756">Sep</p>
+<p style="position:absolute;left:308px;top:338px;width:56px;font-size:24px;text-align:center;color:#3E4756">Oct</p>
+<p style="position:absolute;left:436px;top:338px;width:56px;font-size:24px;text-align:center;color:#3E4756">Nov</p>
+</div>
+</div>
+<div style="width:512px;display:flex;flex-direction:column;gap:8px">
+<p style="font-size:64px;font-weight:700;line-height:1.1;color:#0F1626">3.1 h</p>
+<p style="font-size:24px;color:#3E4756">median from PR open to merge that week</p>
+<div style="position:relative;width:512px;height:376px">
+<svg aria-label="Line chart of weekly hours from PR open to merge: the median rises steadily from 0.3 hours in early August to 3.1 hours the week of November 2; the 90th percentile ranges from 3 to 14 hours and ends at 13 hours" viewBox="0 0 448 310" width="448" height="310" style="position:absolute;left:64px;top:20px;width:448px;height:310px" xmlns="http://www.w3.org/2000/svg">
+<rect x="301.7" y="0" width="45.7" height="310" fill="#E6DFD0"/>
+<line x1="0" y1="1" x2="448" y2="1" stroke="#E2DCCF" stroke-width="2"/>
+<line x1="0" y1="155" x2="448" y2="155" stroke="#E2DCCF" stroke-width="2"/>
+<line x1="0" y1="309" x2="448" y2="309" stroke="#B8AE9C" stroke-width="2"/>
+<polyline points="16.0,197.5 48.0,257.2 80.0,171.8 112.0,219.3 144.0,205.9 176.0,207.6 208.0,135.8 240.0,175.9 272.0,221.9 304.0,167.0" fill="none" stroke="#C2700E" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="368.0,214.6 400.0,97.2 432.0,109.2" fill="none" stroke="#C2700E" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="16.0,305.0 48.0,302.7 80.0,293.9 112.0,294.0 144.0,292.8 176.0,288.9 208.0,291.6 240.0,288.0 272.0,279.9 304.0,284.7 336.0,287.7 368.0,285.2 400.0,271.8 432.0,261.7" fill="none" stroke="#1A6BB0" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="432" cy="109.2" r="6" fill="#C2700E" stroke="#F4F1EA" stroke-width="2"/>
+<circle cx="432" cy="261.7" r="6" fill="#1A6BB0" stroke="#F4F1EA" stroke-width="2"/>
+</svg>
+<p style="position:absolute;left:0px;top:3px;width:52px;font-size:24px;text-align:right;color:#3E4756">20</p>
+<p style="position:absolute;left:0px;top:158px;width:52px;font-size:24px;text-align:right;color:#3E4756">10</p>
+<p style="position:absolute;left:0px;top:313px;width:52px;font-size:24px;text-align:right;color:#3E4756">0</p>
+<div style="position:absolute;left:76px;top:30px;width:260px;display:flex;flex-direction:row;align-items:center;gap:10px">
+<div style="width:28px;height:4px;flex:none;background:#1A6BB0"></div>
+<p style="font-size:24px;line-height:1.1;color:#3E4756">median</p>
+<div style="width:28px;height:4px;flex:none;background:#C2700E"></div>
+<p style="font-size:24px;line-height:1.1;color:#3E4756">p90</p>
+</div>
+<p style="position:absolute;left:452px;top:76px;width:60px;font-size:24px;line-height:1.1;font-weight:600;text-align:right;white-space:nowrap;color:#0F1626">13 h</p>
+<p style="position:absolute;left:448px;top:246px;width:64px;font-size:24px;line-height:1.1;font-weight:600;text-align:right;white-space:nowrap;color:#0F1626">3.1 h</p>
+<p style="position:absolute;left:52px;top:338px;width:56px;font-size:24px;text-align:center;color:#3E4756">Aug</p>
+<p style="position:absolute;left:180px;top:338px;width:56px;font-size:24px;text-align:center;color:#3E4756">Sep</p>
+<p style="position:absolute;left:308px;top:338px;width:56px;font-size:24px;text-align:center;color:#3E4756">Oct</p>
+<p style="position:absolute;left:436px;top:338px;width:56px;font-size:24px;text-align:center;color:#3E4756">Nov</p>
+</div>
+</div>
+</div>
+<div style="display:flex;flex-direction:row;align-items:center;gap:36px;border-top:2px solid #E2DCCF;padding:20px 0px 0px 0px">
+<p style="flex:none;font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#8A5A0A">LOOP COST</p>
+<div style="display:flex;flex-direction:row;align-items:center;gap:12px">
+<p style="font-size:36px;font-weight:700;line-height:1.1;color:#0F1626">21M</p>
+<p style="font-size:24px;line-height:1.2;white-space:nowrap;color:#3E4756">tokens per merged PR</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:center;gap:12px">
+<p style="font-size:36px;font-weight:700;line-height:1.1;color:#0F1626">3.2</p>
+<p style="font-size:24px;line-height:1.2;white-space:nowrap;color:#3E4756">agent sessions per PR</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:center;gap:12px">
+<p style="font-size:36px;font-weight:700;line-height:1.1;color:#0F1626">45%</p>
+<p style="font-size:24px;line-height:1.2;white-space:nowrap;color:#3E4756">of sessions were repairs</p>
+</div>
+<div style="display:flex;flex-direction:row;align-items:center;gap:12px">
+<p style="font-size:36px;font-weight:700;line-height:1.1;color:#0F1626">1.5</p>
+<p style="font-size:24px;line-height:1.2;white-space:nowrap;color:#3E4756">review rounds per PR</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#3E4756">Sources: GitHub search, 5,068 PRs merged Aug 5 – Nov 9; loop beacon #142 and trial read on #7867 · Shaded: coordinator off Oct 8–17</p>
+<aside hidden>Three trends, and four numbers for where the loop is right now. The charts come from GitHub search over every merged PR since the first one on August 5, in Monday-to-Sunday weeks. The shaded band is my vacation, October 8 to 17, when I couldn’t leave the coordinator running, so nothing merged. Throughput went from about 28 merged PRs a day in August to 79 last week, with a peak of 94. First pass means a PR merged without ever needing a salvage session. Salvage only started in late August, so the line starts there at 83%. It dropped to 40% in late September as volume jumped and has sat around 64% since, short of the 70% target. Open to merge runs from when the draft PR opens, which is at claim time, to when it lands, so it includes the work itself. The median has crept up from 20 minutes to about 3 hours and the slowest tenth take 13 hours or more. The gap in the p90 line is the week of October 12, where PRs stuck over the vacation took 199 hours. The bottom row is what a merged PR costs right now. Tokens per merged PR is the Loop and watch steward’s 24-hour read after the November 8 compaction change: 21 million, down from 37.5 million the day before. The other three are from the loop’s own beacon, the status issue the coordinator rewrites every pass, for the 7 days to November 10: 3.2 agent sessions per merged PR, 45% of sessions doing repair work like salvage and conflict fixes, and 1.5 review rounds per merged PR with a median of one. The beacon’s own 7-day first-pass figure is 59.5%, a little under last week’s 64%.</aside>
+</section>
+<section id="lessons" class="slide" aria-label="Slide 19: What we learned" style="background:#F4F1EA;color:#0F1626;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:40px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#0F1626">What we learned</h2>
+<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
+<h3 style="font-size:36px;font-weight:600;line-height:1.2;color:#0F1626">Green branches can still break main</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Two green PRs broke main together on August 18. The train now tests the exact tree that lands.</p>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
+<h3 style="font-size:36px;font-weight:600;line-height:1.2;color:#0F1626">Don’t act on a guess</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">If the coordinator can’t read a state, it waits and doesn’t count it as a failure. Most of its rules came from incidents.</p>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
+<h3 style="font-size:36px;font-weight:600;line-height:1.2;color:#0F1626">Context is most of the bill</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">Cache reads were 98.7% of input and still most of the cost. The starting prompt went from 103K to about 8K tokens.</p>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
+<h3 style="font-size:36px;font-weight:600;line-height:1.2;color:#0F1626">Nine handoff formats were too many</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">They drifted apart. One JSON record, validated on both ends, replaced them.</p>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
+<h3 style="font-size:36px;font-weight:600;line-height:1.2;color:#0F1626">Sessions die, so state lives on GitHub</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">A steward that crashes or loses its machine comes back from its parent issue alone.</p>
+</div>
+<div style="background:#FBF9F4;border:2px solid #E2DCCF;border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:8px">
+<h3 style="font-size:36px;font-weight:600;line-height:1.2;color:#0F1626">A paused lane has to look paused</h3>
+<p style="font-size:28px;line-height:1.35;color:#3E4756">A dead runner showed as online for nine hours in August. Paused lanes now fail on purpose.</p>
+</div>
+</div>
+<aside hidden>Six things we learned the hard way. On August 18 two unrelated PRs, each green on its own branch, broke main for about two and a half hours. That’s why the merge train exists. The coordinator’s refusal rules mostly came out of incidents too: re-read before writing, cap the irreversible writes, and never treat unknown as red. On cost, nearly all the input was cached and it still dominated the bill, so the job card work cut the starting prompt more than tenfold and compaction now starts at 150K. The nine handoff formats drifted until one schema replaced them, and the last legacy fallback is being retired under #8273. Sessions are disposable, so no steward keeps state in its head. And on August 19 GitHub showed a Unity runner online and busy for nine hours with nothing behind it, so paused lanes now fail loudly. One more that didn’t fit on the slide: estimates miss. About a third of merged PRs go over budget, which is why budgets are now calibrated from every recent receipt.</aside>
+</section>
+<section id="next" class="slide" aria-label="Slide 20: What’s next" style="background:#0F1626;color:#F4F1EA;font-family:'IBM Plex Sans', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;gap:56px">
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F1EA">What’s next</h2>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#D9A441">THE GAME</p>
+<div style="display:flex;flex-direction:row;align-items:stretch;gap:16px">
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:4px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#B9C4D6">SHIPPED</p>
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">M0–M5</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">Economy, factions, conflict, the player</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #D9A441;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:4px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#D9A441">NOW</p>
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">M5B</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">Depth before the ladder<br>About 90% done</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:4px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#B9C4D6">NEXT</p>
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">v0.0.1 MVP</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">Test build, with the Gate A playtest</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:4px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#B9C4D6">THEN</p>
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">M6</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">The automation ladder</p>
+</div>
+<div class="arrow-right" aria-hidden="true" style="flex:none;align-self:center;width:48px;height:24px;background:#D9A441"></div>
+<div style="flex:1;background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:4px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;color:#B9C4D6">LATER</p>
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">M6B</h3>
+<p style="font-size:24px;line-height:1.35;color:#B9C4D6">Base and defence, ending at Gate B</p>
+</div>
+</div>
+</div>
+<div style="display:flex;flex-direction:column;gap:16px">
+<p style="font-family:'JetBrains Mono', 'Courier New', monospace;font-size:24px;letter-spacing:2px;color:#5FA8D3">THE LOOP</p>
+<div style="display:grid;grid-template-columns:repeat(3, 1fr);gap:32px">
+<div style="background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:8px">
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">Finish session records</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Retire the last text handoffs (#8273), and give the coordinator’s App its new name.</p>
+</div>
+<div style="background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:8px">
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">Watch spend</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">See what the token ceiling and recalibrated budgets do to tokens per merged PR.</p>
+</div>
+<div style="background:#18223A;border:2px solid #2B3A55;border-radius:16px;padding:24px;display:flex;flex-direction:column;gap:8px">
+<h3 style="font-size:36px;font-weight:600;color:#F4F1EA">Raise first pass</h3>
+<p style="font-size:28px;line-height:1.35;color:#B9C4D6">Get first-pass merges from the low 60s up to the 70% target.</p>
+</div>
+</div>
+</div>
+<aside hidden>On the game side, M0 through M5 have shipped: foundations, markets and production, freighters and the map, factions that build, conflict, the Observatory and the player entering the game. M5 shipped on November 9. M5B, depth before the automation ladder, is in delivery now and about 90% done: 151 of its 166 issues were closed on November 10, with five issues and a nine-seed check left before it ships. Then comes a polish phase and the v0.0.1 MVP test build, which is where Gate A gets its attended verdict: a living galaxy you can watch, with no player verbs, to show the hard part works. After that M6 builds the automation ladder, and M6B adds base and defence and ends at Gate B, the Magnate Slice: one freighter climbing the first rungs inside that living galaxy, which is the proof it’s a game. On the loop side there are three things. Finish moving every handoff onto session records and give the coordinator’s App its proper name. Keep a close eye on spend now that the November 8 changes are in. And get first-pass merges up to the 70% target, since every repair pass costs tokens and hours.</aside>
+</section>
+</main>
+</div>
+<div id="notes" hidden aria-live="polite"><p></p></div>
+<div id="bar" role="toolbar" aria-label="Slide controls">
+<button id="prev" type="button" aria-label="Previous slide">&#8249;</button>
+<span id="counter">1 / 20</span>
+<button id="next" type="button" aria-label="Next slide">&#8250;</button>
+<button id="notes-toggle" type="button" aria-pressed="false" title="Speaker notes (N)">Notes</button>
+<button id="full" type="button" title="Full screen (F)">Full screen</button>
+</div>
+<script>
+(function () {
+  var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var stage = document.getElementById('stage');
+  var bar = document.getElementById('bar');
+  var counter = document.getElementById('counter');
+  var notes = document.getElementById('notes');
+  var notesText = notes.querySelector('p');
+  var notesToggle = document.getElementById('notes-toggle');
+  var current = 0;
+  var sleepTimer = 0;
+
+  function fit() {
+    var w = window.innerWidth;
+    var h = window.innerHeight - (notes.hidden ? 0 : notes.offsetHeight);
+    var scale = Math.min(w / 1920, h / 1080);
+    stage.style.top = (h / 2) + 'px';
+    stage.style.transform = 'translate(-50%, -50%) scale(' + scale + ')';
+    stage.style.visibility = 'visible';
+  }
+
+  function fromHash() {
+    var m = /^#slide-(\d+)$/.exec(location.hash);
+    var n = m ? parseInt(m[1], 10) - 1 : 0;
+    return Math.max(0, Math.min(slides.length - 1, n));
+  }
+
+  function show(index, keepHash) {
+    current = Math.max(0, Math.min(slides.length - 1, index));
+    slides.forEach(function (slide, i) {
+      slide.classList.toggle('active', i === current);
+      slide.setAttribute('aria-hidden', i === current ? 'false' : 'true');
+    });
+    counter.textContent = (current + 1) + ' / ' + slides.length;
+    var aside = slides[current].querySelector('aside');
+    notesText.textContent = aside ? aside.textContent : '';
+    notes.scrollTop = 0;
+    if (!keepHash) history.replaceState(null, '', '#slide-' + (current + 1));
+  }
+
+  function toggleNotes() {
+    notes.hidden = !notes.hidden;
+    notesToggle.setAttribute('aria-pressed', notes.hidden ? 'false' : 'true');
+    fit();
+  }
+
+  function toggleFull() {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+  }
+
+  function wake() {
+    bar.classList.add('awake');
+    clearTimeout(sleepTimer);
+    sleepTimer = setTimeout(function () { bar.classList.remove('awake'); }, 2500);
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    var onButton = e.target && e.target.tagName === 'BUTTON';
+    switch (e.key) {
+      case 'ArrowRight': case 'ArrowDown': case 'PageDown': show(current + 1); break;
+      case ' ': case 'Enter': if (onButton) return; show(current + 1); break;
+      case 'ArrowLeft': case 'ArrowUp': case 'PageUp': case 'Backspace': show(current - 1); break;
+      case 'Home': show(0); break;
+      case 'End': show(slides.length - 1); break;
+      case 'n': case 'N': toggleNotes(); break;
+      case 'f': case 'F': toggleFull(); break;
+      default: return;
+    }
+    e.preventDefault();
+  });
+
+  stage.addEventListener('click', function (e) {
+    if (e.target.closest('a')) return;
+    if (String(window.getSelection())) return;
+    var box = stage.getBoundingClientRect();
+    show(current + (e.clientX - box.left < box.width / 3 ? -1 : 1));
+  });
+
+  var touchX = null;
+  document.addEventListener('touchstart', function (e) { touchX = e.touches.length === 1 ? e.touches[0].clientX : null; }, { passive: true });
+  document.addEventListener('touchend', function (e) {
+    if (touchX === null) return;
+    var dx = e.changedTouches[0].clientX - touchX;
+    touchX = null;
+    if (Math.abs(dx) > 48) show(current + (dx < 0 ? 1 : -1));
+  }, { passive: true });
+
+  document.getElementById('prev').addEventListener('click', function () { show(current - 1); });
+  document.getElementById('next').addEventListener('click', function () { show(current + 1); });
+  notesToggle.addEventListener('click', toggleNotes);
+  document.getElementById('full').addEventListener('click', toggleFull);
+  document.addEventListener('mousemove', wake);
+  window.addEventListener('resize', fit);
+  window.addEventListener('hashchange', function () { show(fromHash(), true); });
+
+  fit();
+  show(fromHash(), !location.hash);
+})();
+</script>
+</body>
+</html>
